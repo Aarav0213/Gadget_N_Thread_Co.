@@ -60,11 +60,11 @@ const Products = () => {
       category: categoryFilter,
       search: searchQuery,
       minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
-      maxPrice: priceRange[1] < maxProductPrice ? priceRange[1] : undefined,
+      maxPrice: priceRange[1] < 500 ? priceRange[1] : undefined, // 500 means no upper limit
       inStock: inStockOnly || undefined,
     });
     return sortProducts(filtered, sortBy);
-  }, [categoryFilter, searchQuery, sortBy, priceRange, inStockOnly, maxProductPrice]);
+  }, [categoryFilter, searchQuery, sortBy, priceRange, inStockOnly]);
 
   const updateFilter = (key: string, value: string | null) => {
     const newParams = new URLSearchParams(searchParams);
@@ -139,14 +139,53 @@ const Products = () => {
           <Slider
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
+            min={0}
             max={500}
             step={10}
             className="w-full"
           />
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>${priceRange[0]}</span>
-            <span>${priceRange[1]}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Label htmlFor="minPrice" className="text-xs text-muted-foreground">Min</Label>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input
+                  id="minPrice"
+                  type="number"
+                  min={0}
+                  max={priceRange[1]}
+                  value={priceRange[0]}
+                  onChange={(e) => {
+                    const val = Math.min(Number(e.target.value) || 0, priceRange[1]);
+                    setPriceRange([val, priceRange[1]]);
+                  }}
+                  className="pl-5 h-8 text-sm"
+                />
+              </div>
+            </div>
+            <span className="text-muted-foreground mt-5">–</span>
+            <div className="flex-1">
+              <Label htmlFor="maxPrice" className="text-xs text-muted-foreground">Max</Label>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <Input
+                  id="maxPrice"
+                  type="number"
+                  min={priceRange[0]}
+                  max={500}
+                  value={priceRange[1]}
+                  onChange={(e) => {
+                    const val = Math.max(Number(e.target.value) || 0, priceRange[0]);
+                    setPriceRange([priceRange[0], Math.min(val, 500)]);
+                  }}
+                  className="pl-5 h-8 text-sm"
+                />
+              </div>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            {priceRange[1] >= 500 ? '$500+ (no upper limit)' : `Up to $${priceRange[1]}`}
+          </p>
         </CollapsibleContent>
       </Collapsible>
 

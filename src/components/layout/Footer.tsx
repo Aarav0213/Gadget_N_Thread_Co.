@@ -68,11 +68,6 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/returns" className="hover:text-foreground transition-colors">
-                  Returns & Refunds
-                </Link>
-              </li>
-              <li>
                 <Link to="/track-order" className="hover:text-foreground transition-colors">
                   Track Order
                 </Link>

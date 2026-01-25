@@ -426,23 +426,295 @@ DELETE /api/admin/upload/:filename - Delete file
 
 ---
 
-## Payment Integration
+## ⚠️ CRITICAL: Admin Access Security
 
-### Stripe
-1. Create a Stripe account
-2. Get your API keys (publishable + secret)
-3. Implement:
-   - Create PaymentIntent on order creation
-   - Handle webhook for payment confirmation
-   - Store payment_intent_id in orders table
+### Secure Role Management
 
-### PayPal
-1. Create PayPal Developer account
-2. Get Client ID and Secret
-3. Implement:
-   - Create PayPal order on checkout
-   - Capture payment on approval
-   - Handle webhooks for payment events
+**NEVER** store roles in the users table or check admin status on the frontend. Use a separate roles table:
+
+```sql
+-- Create role enum
+CREATE TYPE app_role AS ENUM ('admin', 'customer');
+
+-- Create user_roles table
+CREATE TABLE user_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  role app_role NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, role)
+);
+
+-- Security definer function to check roles (prevents recursive queries)
+CREATE OR REPLACE FUNCTION has_role(_user_id UUID, _role app_role)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM user_roles
+    WHERE user_id = _user_id
+      AND role = _role
+  )
+$$;
+```
+
+### Granting Admin Access (Manual DB Edit)
+
+To make yourself an admin, run this SQL in your database:
+
+```sql
+-- Replace 'your-user-id' with your actual user ID from the users table
+INSERT INTO user_roles (user_id, role) 
+VALUES ('your-user-id', 'admin');
+```
+
+Or find your user first:
+```sql
+SELECT id, email FROM users WHERE email = 'your-email@example.com';
+-- Then insert with the returned ID
+INSERT INTO user_roles (user_id, role) VALUES ('<returned-id>', 'admin');
+```
+
+### Backend Middleware Example (Node.js/Express)
+
+```javascript
+// Middleware to check admin role
+const requireAdmin = async (req, res, next) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  // Check role in database
+  const result = await db.query(
+    'SELECT * FROM user_roles WHERE user_id = $1 AND role = $2',
+    [userId, 'admin']
+  );
+  
+  if (result.rows.length === 0) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  next();
+};
+
+// Apply to admin routes
+app.use('/api/admin/*', requireAdmin);
+```
+
+---
+
+## Payment Integration (CRITICAL)
+
+### Stripe Integration Steps
+
+1. **Create Stripe Account**: Go to stripe.com and create an account
+2. **Get API Keys**: Dashboard → Developers → API Keys
+3. **Install Stripe SDK**: `npm install stripe`
+
+### Backend Payment Flow (Node.js Example)
+
+```javascript
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// POST /api/orders - Create order with payment
+app.post('/api/orders', async (req, res) => {
+  const { items, shippingAddress, discountCode } = req.body;
+  const userId = req.user.id;
+  
+  // 1. Calculate totals on SERVER (never trust client prices!)
+  let subtotal = 0;
+  const orderItems = [];
+  
+  for (const item of items) {
+    // Fetch product from DB to get real price
+    const product = await db.query('SELECT * FROM products WHERE id = $1', [item.productId]);
+    if (!product.rows[0]) throw new Error('Product not found');
+    
+    const realPrice = product.rows[0].price;
+    const itemTotal = realPrice * item.quantity;
+    subtotal += itemTotal;
+    
+    orderItems.push({
+      product_id: item.productId,
+      product_name: product.rows[0].name,
+      quantity: item.quantity,
+      unit_price: realPrice,
+      total_price: itemTotal,
+      shipping_cost: product.rows[0].is_free_shipping ? 0 : product.rows[0].shipping_cost
+    });
+  }
+  
+  // 2. Calculate shipping and discounts
+  const shippingTotal = orderItems.reduce((sum, item) => sum + item.shipping_cost * item.quantity, 0);
+  let discountTotal = 0;
+  
+  if (discountCode) {
+    const discount = await validateDiscount(discountCode, subtotal);
+    if (discount) {
+      discountTotal = discount.type === 'percentage' 
+        ? subtotal * (discount.value / 100)
+        : discount.value;
+    }
+  }
+  
+  const grandTotal = subtotal + shippingTotal - discountTotal;
+  
+  // 3. Create Stripe PaymentIntent
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(grandTotal * 100), // Stripe uses cents
+    currency: 'usd',
+    metadata: { user_id: userId }
+  });
+  
+  // 4. Create order in database with 'pending' payment status
+  const order = await db.query(`
+    INSERT INTO orders (
+      user_id, order_number, subtotal, shipping_total, discount_total, grand_total,
+      payment_intent_id, payment_status, status, ...shipping fields
+    ) VALUES ($1, $2, $3, ...) RETURNING *
+  `, [userId, generateOrderNumber(), subtotal, shippingTotal, discountTotal, grandTotal, paymentIntent.id, 'pending', 'pending', ...]);
+  
+  // 5. Insert order items
+  for (const item of orderItems) {
+    await db.query('INSERT INTO order_items (...) VALUES (...)', [...]);
+  }
+  
+  // 6. Return client secret for frontend to complete payment
+  res.json({
+    orderId: order.rows[0].id,
+    clientSecret: paymentIntent.client_secret
+  });
+});
+```
+
+### Stripe Webhook Handler (CRITICAL for payment confirmation)
+
+```javascript
+// POST /api/webhooks/stripe
+app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+    
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      
+      // Update order status to paid
+      await db.query(`
+        UPDATE orders 
+        SET payment_status = 'paid', status = 'processing'
+        WHERE payment_intent_id = $1
+      `, [paymentIntent.id]);
+      
+      // Send confirmation email
+      await sendOrderConfirmationEmail(order);
+    }
+    
+    if (event.type === 'payment_intent.payment_failed') {
+      const paymentIntent = event.data.object;
+      await db.query(`
+        UPDATE orders SET payment_status = 'failed'
+        WHERE payment_intent_id = $1
+      `, [paymentIntent.id]);
+    }
+    
+    res.json({ received: true });
+  } catch (err) {
+    res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+});
+```
+
+### Frontend Payment Completion
+
+Update `src/pages/Checkout.tsx` to use Stripe Elements:
+
+```typescript
+// Install: npm install @stripe/stripe-js @stripe/react-stripe-js
+
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+// In checkout, after user submits:
+const { orderId, clientSecret } = await api.createOrder(orderData);
+
+// Then use clientSecret with Stripe Elements to complete payment
+const stripe = useStripe();
+const { error } = await stripe.confirmPayment({
+  elements,
+  confirmParams: { return_url: `${window.location.origin}/order-confirmation/${orderId}` }
+});
+```
+
+---
+
+## Order History Implementation
+
+Ensure orders are returned to users:
+
+```javascript
+// GET /api/orders
+app.get('/api/orders', async (req, res) => {
+  const userId = req.user.id;
+  
+  const orders = await db.query(`
+    SELECT o.*, 
+      json_agg(json_build_object(
+        'id', oi.id,
+        'product_name', oi.product_name,
+        'quantity', oi.quantity,
+        'unit_price', oi.unit_price,
+        'product_image_url', oi.product_image_url
+      )) as items
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.user_id = $1
+    GROUP BY o.id
+    ORDER BY o.created_at DESC
+  `, [userId]);
+  
+  res.json(orders.rows);
+});
+```
+
+---
+
+## Messages System
+
+```javascript
+// POST /api/conversations - Create conversation
+app.post('/api/conversations', async (req, res) => {
+  const { subject, message, productId } = req.body;
+  const userId = req.user.id;
+  
+  const conv = await db.query(`
+    INSERT INTO conversations (user_id, subject, product_id, last_message_at)
+    VALUES ($1, $2, $3, NOW()) RETURNING *
+  `, [userId, subject, productId]);
+  
+  await db.query(`
+    INSERT INTO messages (conversation_id, sender_id, sender_type, content)
+    VALUES ($1, $2, 'customer', $3)
+  `, [conv.rows[0].id, userId, message]);
+  
+  // Notify admin via email
+  await sendEmailToAdmin('New message', { subject, message, userId });
+  
+  res.json(conv.rows[0]);
+});
+```
 
 ---
 
@@ -503,7 +775,7 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 JWT_SECRET=your-super-secret-key
 JWT_EXPIRES_IN=7d
 
-# Stripe
+# Stripe (REQUIRED for payments)
 STRIPE_SECRET_KEY=sk_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PUBLISHABLE_KEY=pk_...
@@ -541,3 +813,18 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:30
 ```
 
 Then set `VITE_API_URL` in your environment to point to your self-hosted backend.
+
+---
+
+## Quick Checklist to Get Started
+
+1. [ ] Set up PostgreSQL database
+2. [ ] Run the CREATE TABLE statements above
+3. [ ] Create your user account
+4. [ ] **Run the INSERT INTO user_roles SQL to make yourself admin**
+5. [ ] Set up Stripe account and get API keys
+6. [ ] Implement the API endpoints (Node.js/Express, Python/FastAPI, etc.)
+7. [ ] Set up Stripe webhook endpoint
+8. [ ] Configure email service
+9. [ ] Set VITE_API_URL in frontend environment
+10. [ ] Test the full order flow

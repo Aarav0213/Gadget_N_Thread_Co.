@@ -5,7 +5,7 @@ import { ArrowRight, Truck, Shield, Headphones } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
 import { ProductGrid } from '@/components/products/ProductGrid';
-import { supabase } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import type { Product, Category } from '@/lib/api';
 
 const Index = () => {

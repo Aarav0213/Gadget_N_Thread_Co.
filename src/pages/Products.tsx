@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,21 +28,25 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { mockProducts, mockCategories, filterProducts, sortProducts } from '@/lib/mockData';
+import { supabase } from '@/lib/api';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'popular' | 'rating';
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
-  
+
+  // Database data
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+
   // Get filters from URL
   const searchQuery = searchParams.get('search') || '';
   const categoryFilter = searchParams.get('category') || '';
   const sortBy = (searchParams.get('sort') as SortOption) || 'newest';
   const minPriceParam = searchParams.get('minPrice');
   const maxPriceParam = searchParams.get('maxPrice');
-  
+
   // Local filter state
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [priceRange, setPriceRange] = useState<[number, number]>([
@@ -51,28 +55,41 @@ const Products = () => {
   ]);
   const [inStockOnly, setInStockOnly] = useState(false);
 
-  // Get price range from products
-  const maxProductPrice = Math.max(...mockProducts.map((p) => p.price));
+  // Fetch products and categories from Supabase
+  useEffect(() => {
+    supabase.from('categories').select('*').then(({ data }) => setCategories(data || []));
+    supabase.from('products').select('*').then(({ data }) => setProducts(data || []));
+  }, []);
+
+  const maxProductPrice = Math.max(...products.map((p) => p.price), 500);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
-    const filtered = filterProducts(mockProducts, {
-      category: categoryFilter,
-      search: searchQuery,
-      minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
-      maxPrice: priceRange[1] < 500 ? priceRange[1] : undefined, // 500 means no upper limit
-      inStock: inStockOnly || undefined,
-    });
-    return sortProducts(filtered, sortBy);
-  }, [categoryFilter, searchQuery, sortBy, priceRange, inStockOnly]);
+    let filtered = [...products];
+
+    if (categoryFilter) filtered = filtered.filter((p) => p.category_id === categoryFilter);
+    if (searchQuery) filtered = filtered.filter((p) =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (priceRange[0] > 0) filtered = filtered.filter((p) => p.price >= priceRange[0]);
+    if (priceRange[1] < 500) filtered = filtered.filter((p) => p.price <= priceRange[1]);
+    if (inStockOnly) filtered = filtered.filter((p) => p.stock > 0);
+
+    switch (sortBy) {
+      case 'price_asc': filtered.sort((a, b) => a.price - b.price); break;
+      case 'price_desc': filtered.sort((a, b) => b.price - a.price); break;
+      case 'newest': filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+      case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
+      case 'popular': filtered.sort((a, b) => (b.sales || 0) - (a.sales || 0)); break;
+    }
+
+    return filtered;
+  }, [products, categoryFilter, searchQuery, sortBy, priceRange, inStockOnly]);
 
   const updateFilter = (key: string, value: string | null) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set(key, value);
-    } else {
-      newParams.delete(key);
-    }
+    if (value) newParams.set(key, value);
+    else newParams.delete(key);
     setSearchParams(newParams);
   };
 
@@ -98,7 +115,6 @@ const Products = () => {
 
   const FilterContent = () => (
     <div className="space-y-6">
-      {/* Categories */}
       <Collapsible defaultOpen>
         <CollapsibleTrigger className="flex items-center justify-between w-full py-2 font-medium">
           Categories
@@ -113,12 +129,12 @@ const Products = () => {
           >
             All Categories
           </button>
-          {mockCategories.map((category) => (
+          {categories.map((category) => (
             <button
               key={category.id}
-              onClick={() => updateFilter('category', category.slug)}
+              onClick={() => updateFilter('category', category.id)}
               className={`block text-sm w-full text-left py-1 ${
-                categoryFilter === category.slug
+                categoryFilter === category.id
                   ? 'font-medium text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -140,52 +156,37 @@ const Products = () => {
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
             min={0}
-            max={500}
+            max={maxProductPrice}
             step={10}
             className="w-full"
           />
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <Label htmlFor="minPrice" className="text-xs text-muted-foreground">Min</Label>
-              <div className="relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                <Input
-                  id="minPrice"
-                  type="number"
-                  min={0}
-                  max={priceRange[1]}
-                  value={priceRange[0]}
-                  onChange={(e) => {
-                    const val = Math.min(Number(e.target.value) || 0, priceRange[1]);
-                    setPriceRange([val, priceRange[1]]);
-                  }}
-                  className="pl-5 h-8 text-sm"
-                />
-              </div>
+              <Input
+                id="minPrice"
+                type="number"
+                min={0}
+                max={priceRange[1]}
+                value={priceRange[0]}
+                onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])}
+                className="h-8 text-sm"
+              />
             </div>
             <span className="text-muted-foreground mt-5">–</span>
             <div className="flex-1">
               <Label htmlFor="maxPrice" className="text-xs text-muted-foreground">Max</Label>
-              <div className="relative">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                <Input
-                  id="maxPrice"
-                  type="number"
-                  min={priceRange[0]}
-                  max={500}
-                  value={priceRange[1]}
-                  onChange={(e) => {
-                    const val = Math.max(Number(e.target.value) || 0, priceRange[0]);
-                    setPriceRange([priceRange[0], Math.min(val, 500)]);
-                  }}
-                  className="pl-5 h-8 text-sm"
-                />
-              </div>
+              <Input
+                id="maxPrice"
+                type="number"
+                min={priceRange[0]}
+                max={maxProductPrice}
+                value={priceRange[1]}
+                onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
+                className="h-8 text-sm"
+              />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground text-center">
-            {priceRange[1] >= 500 ? '$500+ (no upper limit)' : `Up to $${priceRange[1]}`}
-          </p>
         </CollapsibleContent>
       </Collapsible>
 
@@ -202,14 +203,11 @@ const Products = () => {
               checked={inStockOnly}
               onCheckedChange={(checked) => setInStockOnly(checked as boolean)}
             />
-            <Label htmlFor="inStock" className="text-sm">
-              In Stock Only
-            </Label>
+            <Label htmlFor="inStock" className="text-sm">In Stock Only</Label>
           </div>
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Clear Filters */}
       {activeFilterCount > 0 && (
         <Button variant="outline" className="w-full" onClick={clearFilters}>
           Clear All Filters ({activeFilterCount})
@@ -225,7 +223,7 @@ const Products = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">
             {categoryFilter
-              ? mockCategories.find((c) => c.slug === categoryFilter)?.name || 'Products'
+              ? categories.find((c) => c.id === categoryFilter)?.name || 'Products'
               : 'All Products'}
           </h1>
           {searchQuery && (
@@ -319,7 +317,7 @@ const Products = () => {
                   onClick={() => updateFilter('category', null)}
                   className="gap-1"
                 >
-                  {mockCategories.find((c) => c.slug === categoryFilter)?.name}
+                  {categories.find((c) => c.id === categoryFilter)?.name}
                   <X className="h-3 w-3" />
                 </Button>
               )}

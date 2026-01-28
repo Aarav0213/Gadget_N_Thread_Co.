@@ -29,6 +29,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { supabase } from '@/lib/api';
+import type { Product, Category } from '@/lib/api';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'popular' | 'rating';
 
@@ -37,8 +38,9 @@ const Products = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Database data
-  const [products, setProducts] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Get filters from URL
   const searchQuery = searchParams.get('search') || '';
@@ -57,8 +59,35 @@ const Products = () => {
 
   // Fetch products and categories from Supabase
   useEffect(() => {
-    supabase.from('categories').select('*').then(({ data }) => setCategories(data || []));
-    supabase.from('products').select('*').then(({ data }) => setProducts(data || []));
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [productsRes, categoriesRes] = await Promise.all([
+          supabase
+            .from('products')
+            .select(`
+              *,
+              category:categories(*),
+              images:product_images(*)
+            `)
+            .eq('is_active', true),
+          supabase
+            .from('categories')
+            .select('*')
+            .eq('is_active', true)
+            .order('display_order'),
+        ]);
+
+        setProducts(productsRes.data || []);
+        setCategories(categoriesRes.data || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const maxProductPrice = Math.max(...products.map((p) => p.price), 500);
@@ -67,24 +96,48 @@ const Products = () => {
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
 
-    if (categoryFilter) filtered = filtered.filter((p) => p.category_id === categoryFilter);
-    if (searchQuery) filtered = filtered.filter((p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    if (priceRange[0] > 0) filtered = filtered.filter((p) => p.price >= priceRange[0]);
-    if (priceRange[1] < 500) filtered = filtered.filter((p) => p.price <= priceRange[1]);
-    if (inStockOnly) filtered = filtered.filter((p) => p.stock > 0);
+    if (categoryFilter) {
+      filtered = filtered.filter((p) => 
+        p.category_id === categoryFilter || p.category?.slug === categoryFilter
+      );
+    }
+    if (searchQuery) {
+      filtered = filtered.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (priceRange[0] > 0) {
+      filtered = filtered.filter((p) => p.price >= priceRange[0]);
+    }
+    if (priceRange[1] < maxProductPrice) {
+      filtered = filtered.filter((p) => p.price <= priceRange[1]);
+    }
+    if (inStockOnly) {
+      filtered = filtered.filter((p) => p.is_in_stock);
+    }
 
     switch (sortBy) {
-      case 'price_asc': filtered.sort((a, b) => a.price - b.price); break;
-      case 'price_desc': filtered.sort((a, b) => b.price - a.price); break;
-      case 'newest': filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
-      case 'rating': filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-      case 'popular': filtered.sort((a, b) => (b.sales || 0) - (a.sales || 0)); break;
+      case 'price_asc':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price_desc':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'newest':
+        filtered.sort((a, b) => 
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        );
+        break;
+      case 'rating':
+        filtered.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
+        break;
+      case 'popular':
+        filtered.sort((a, b) => (b.review_count || 0) - (a.review_count || 0));
+        break;
     }
 
     return filtered;
-  }, [products, categoryFilter, searchQuery, sortBy, priceRange, inStockOnly]);
+  }, [products, categoryFilter, searchQuery, sortBy, priceRange, inStockOnly, maxProductPrice]);
 
   const updateFilter = (key: string, value: string | null) => {
     const newParams = new URLSearchParams(searchParams);
@@ -132,9 +185,9 @@ const Products = () => {
           {categories.map((category) => (
             <button
               key={category.id}
-              onClick={() => updateFilter('category', category.id)}
+              onClick={() => updateFilter('category', category.slug)}
               className={`block text-sm w-full text-left py-1 ${
-                categoryFilter === category.id
+                categoryFilter === category.slug || categoryFilter === category.id
                   ? 'font-medium text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -223,7 +276,7 @@ const Products = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">
             {categoryFilter
-              ? categories.find((c) => c.id === categoryFilter)?.name || 'Products'
+              ? categories.find((c) => c.slug === categoryFilter || c.id === categoryFilter)?.name || 'Products'
               : 'All Products'}
           </h1>
           {searchQuery && (
@@ -317,7 +370,7 @@ const Products = () => {
                   onClick={() => updateFilter('category', null)}
                   className="gap-1"
                 >
-                  {categories.find((c) => c.id === categoryFilter)?.name}
+                  {categories.find((c) => c.slug === categoryFilter || c.id === categoryFilter)?.name}
                   <X className="h-3 w-3" />
                 </Button>
               )}
@@ -336,10 +389,16 @@ const Products = () => {
 
           {/* Product Grid */}
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground mb-4">
-              {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
-            </p>
-            <ProductGrid products={filteredProducts} columns={3} />
+            {loading ? (
+              <p className="text-muted-foreground">Loading products...</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
+                </p>
+                <ProductGrid products={filteredProducts} columns={3} />
+              </>
+            )}
           </div>
         </div>
       </div>

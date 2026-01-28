@@ -92,8 +92,8 @@ export const useCartStore = create<CartStore>()(
       
       getShippingTotal: () => {
         return get().items.reduce((total, item) => {
-          if (item.product.isFreeShipping) return total;
-          return total + item.product.shippingCost * item.quantity;
+          if (item.product.is_free_shipping) return total;
+          return total + (item.product.shipping_cost ?? 0) * item.quantity;
         }, 0);
       },
       

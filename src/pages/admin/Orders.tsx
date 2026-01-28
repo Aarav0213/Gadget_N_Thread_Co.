@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -28,80 +28,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Eye, Package, Truck } from 'lucide-react';
+import { ordersApi } from '@/lib/api';
 import type { Order } from '@/lib/api';
-
-// Mock orders
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'GT-ABC123',
-    status: 'processing',
-    subtotal: 279.99,
-    shippingTotal: 10.00,
-    discountTotal: 0,
-    grandTotal: 289.99,
-    createdAt: '2024-01-22T10:30:00Z',
-    items: [
-      { id: '1', productName: 'Wireless Headphones Pro', productImageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100', quantity: 1, unitPrice: 199.99, totalPrice: 199.99 },
-      { id: '2', productName: 'USB-C Hub', quantity: 2, unitPrice: 40.00, totalPrice: 80.00 },
-    ],
-    shippingAddress: {
-      fullName: 'John Doe',
-      addressLine1: '123 Main St',
-      city: 'San Francisco',
-      state: 'CA',
-      postalCode: '94102',
-      country: 'United States',
-      phone: '555-0123',
-    },
-  },
-  {
-    id: '2',
-    orderNumber: 'GT-DEF456',
-    status: 'shipped',
-    subtotal: 149.99,
-    shippingTotal: 0,
-    discountTotal: 15.00,
-    grandTotal: 134.99,
-    trackingNumber: '1Z999AA10123456784',
-    trackingUrl: 'https://ups.com/track/1Z999AA10123456784',
-    createdAt: '2024-01-21T14:00:00Z',
-    items: [
-      { id: '3', productName: 'Bluetooth Speaker', productImageUrl: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=100', quantity: 1, unitPrice: 149.99, totalPrice: 149.99 },
-    ],
-    shippingAddress: {
-      fullName: 'Jane Smith',
-      addressLine1: '456 Oak Ave',
-      addressLine2: 'Apt 2B',
-      city: 'New York',
-      state: 'NY',
-      postalCode: '10001',
-      country: 'United States',
-    },
-  },
-  {
-    id: '3',
-    orderNumber: 'GT-GHI789',
-    status: 'pending',
-    subtotal: 79.99,
-    shippingTotal: 5.99,
-    discountTotal: 0,
-    grandTotal: 85.98,
-    createdAt: '2024-01-22T16:45:00Z',
-    items: [
-      { id: '4', productName: 'Wireless Charger', quantity: 1, unitPrice: 49.99, totalPrice: 49.99 },
-      { id: '5', productName: 'Phone Stand', quantity: 1, unitPrice: 30.00, totalPrice: 30.00 },
-    ],
-    shippingAddress: {
-      fullName: 'Bob Wilson',
-      addressLine1: '789 Pine Blvd',
-      city: 'Los Angeles',
-      state: 'CA',
-      postalCode: '90001',
-      country: 'United States',
-    },
-  },
-];
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -123,35 +51,74 @@ const statusOptions = [
 
 export default function AdminOrders() {
   const { toast } = useToast();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingForm, setTrackingForm] = useState({ number: '', url: '' });
 
-  const filteredOrders = mockOrders.filter(order => {
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.shippingAddress.fullName.toLowerCase().includes(searchQuery.toLowerCase());
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await ordersApi.list();
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.shipping_address?.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (orderId: string, newStatus: string) => {
-    toast({
-      title: 'Order updated',
-      description: `Order status changed to ${newStatus}.`,
-    });
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await ordersApi.updateStatus(orderId, newStatus);
+      toast({
+        title: 'Order updated',
+        description: `Order status changed to ${newStatus}.`,
+      });
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update order status.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleAddTracking = () => {
-    if (!trackingForm.number) return;
+  const handleAddTracking = async () => {
+    if (!trackingForm.number || !selectedOrder) return;
     
-    toast({
-      title: 'Tracking added',
-      description: 'Tracking information has been saved.',
-    });
-    
-    setTrackingForm({ number: '', url: '' });
-    setSelectedOrder(null);
+    try {
+      await ordersApi.addTracking(selectedOrder.id, trackingForm.number, trackingForm.url || undefined);
+      toast({
+        title: 'Tracking added',
+        description: 'Tracking information has been saved.',
+      });
+      setTrackingForm({ number: '', url: '' });
+      setSelectedOrder(null);
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to add tracking:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add tracking information.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -190,73 +157,79 @@ export default function AdminOrders() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-[70px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">
-                      {order.orderNumber}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p>{order.shippingAddress.fullName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.shippingAddress.city}, {order.shippingAddress.state}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      ${order.grandTotal.toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={order.status}
-                        onValueChange={(value) => handleStatusChange(order.id, value)}
-                      >
-                        <SelectTrigger className="w-[130px]">
-                          <Badge className={statusColors[order.status]}>
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                          </Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedOrder(order)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            {loading ? (
+              <p className="text-muted-foreground">Loading orders...</p>
+            ) : filteredOrders.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No orders found</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[70px]"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">
+                        {order.order_number}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p>{order.shipping_address?.fullName || 'N/A'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {order.shipping_address?.city}, {order.shipping_address?.state}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        ${order.grand_total.toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) => handleStatusChange(order.id, value)}
+                        >
+                          <SelectTrigger className="w-[130px]">
+                            <Badge className={statusColors[order.status] || 'bg-gray-100 text-gray-800'}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map(option => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -265,7 +238,7 @@ export default function AdminOrders() {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Order {selectedOrder?.orderNumber}</DialogTitle>
+            <DialogTitle>Order {selectedOrder?.order_number}</DialogTitle>
           </DialogHeader>
 
           {selectedOrder && (
@@ -277,22 +250,22 @@ export default function AdminOrders() {
                   Order Items
                 </h3>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item) => (
+                  {selectedOrder.items?.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                      {item.productImageUrl && (
+                      {item.product_image_url && (
                         <img
-                          src={item.productImageUrl}
-                          alt={item.productName}
+                          src={item.product_image_url}
+                          alt={item.product_name}
                           className="w-12 h-12 object-cover rounded"
                         />
                       )}
                       <div className="flex-1">
-                        <p className="font-medium">{item.productName}</p>
+                        <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Qty: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                          Qty: {item.quantity} × ${item.unit_price.toFixed(2)}
                         </p>
                       </div>
-                      <p className="font-medium">${item.totalPrice.toFixed(2)}</p>
+                      <p className="font-medium">${item.total_price.toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
@@ -307,52 +280,54 @@ export default function AdminOrders() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span>{selectedOrder.shippingTotal === 0 ? 'Free' : `$${selectedOrder.shippingTotal.toFixed(2)}`}</span>
+                    <span>{selectedOrder.shipping_total === 0 ? 'Free' : `$${selectedOrder.shipping_total.toFixed(2)}`}</span>
                   </div>
-                  {selectedOrder.discountTotal > 0 && (
+                  {selectedOrder.discount_total > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span>-${selectedOrder.discountTotal.toFixed(2)}</span>
+                      <span>-${selectedOrder.discount_total.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total</span>
-                    <span>${selectedOrder.grandTotal.toFixed(2)}</span>
+                    <span>${selectedOrder.grand_total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Shipping Address */}
-              <div className="border-t pt-4">
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  Shipping Address
-                </h3>
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground">{selectedOrder.shippingAddress.fullName}</p>
-                  <p>{selectedOrder.shippingAddress.addressLine1}</p>
-                  {selectedOrder.shippingAddress.addressLine2 && (
-                    <p>{selectedOrder.shippingAddress.addressLine2}</p>
-                  )}
-                  <p>
-                    {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} {selectedOrder.shippingAddress.postalCode}
-                  </p>
-                  <p>{selectedOrder.shippingAddress.country}</p>
-                  {selectedOrder.shippingAddress.phone && (
-                    <p className="mt-1">Phone: {selectedOrder.shippingAddress.phone}</p>
-                  )}
+              {selectedOrder.shipping_address && (
+                <div className="border-t pt-4">
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Shipping Address
+                  </h3>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">{selectedOrder.shipping_address.fullName}</p>
+                    <p>{selectedOrder.shipping_address.addressLine1}</p>
+                    {selectedOrder.shipping_address.addressLine2 && (
+                      <p>{selectedOrder.shipping_address.addressLine2}</p>
+                    )}
+                    <p>
+                      {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.postalCode}
+                    </p>
+                    <p>{selectedOrder.shipping_address.country}</p>
+                    {selectedOrder.shipping_address.phone && (
+                      <p className="mt-1">Phone: {selectedOrder.shipping_address.phone}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Tracking */}
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-3">Tracking Information</h3>
-                {selectedOrder.trackingNumber ? (
+                {selectedOrder.tracking_number ? (
                   <div className="p-3 bg-muted rounded-lg">
-                    <p className="font-mono text-sm">{selectedOrder.trackingNumber}</p>
-                    {selectedOrder.trackingUrl && (
+                    <p className="font-mono text-sm">{selectedOrder.tracking_number}</p>
+                    {selectedOrder.tracking_url && (
                       <a
-                        href={selectedOrder.trackingUrl}
+                        href={selectedOrder.tracking_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-primary hover:underline"

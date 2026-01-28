@@ -22,8 +22,10 @@ import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye } from 'lucide-react'
 import { ProductFormDialog } from '@/components/admin/ProductFormDialog'
 import { productsApi } from '@/lib/api'
 import type { Product } from '@/lib/api'
+import { useToast } from '@/hooks/use-toast'
 
 export default function AdminProducts() {
+  const { toast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -37,8 +39,8 @@ export default function AdminProducts() {
   const loadProducts = async () => {
     try {
       setLoading(true)
-      const res = await productsApi.list({ limit: 100 })
-      setProducts(res.products)
+      const res = await productsApi.list()
+      setProducts(res || [])
     } catch (err) {
       console.error('Failed to load products', err)
     } finally {
@@ -58,6 +60,26 @@ export default function AdminProducts() {
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setIsFormOpen(true)
+  }
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return
+    
+    try {
+      await productsApi.delete(product.id)
+      toast({
+        title: 'Product deleted',
+        description: `${product.name} has been deleted.`,
+      })
+      loadProducts()
+    } catch (err) {
+      console.error('Failed to delete product', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete product.',
+        variant: 'destructive',
+      })
+    }
   }
 
   return (
@@ -114,9 +136,9 @@ export default function AdminProducts() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-muted rounded overflow-hidden">
-                            {product.images?.[0]?.imageUrl && (
+                            {product.images?.[0]?.image_url && (
                               <img
-                                src={product.images[0].imageUrl}
+                                src={product.images[0].image_url}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                               />
@@ -125,7 +147,7 @@ export default function AdminProducts() {
                           <div>
                             <p className="font-medium">{product.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {product.reviewCount ?? 0} reviews
+                              {product.review_count ?? 0} reviews
                             </p>
                           </div>
                         </div>
@@ -142,9 +164,9 @@ export default function AdminProducts() {
                           <p className="font-medium">
                             ${product.price.toFixed(2)}
                           </p>
-                          {product.compareAtPrice && (
+                          {product.compare_at_price && (
                             <p className="text-sm text-muted-foreground line-through">
-                              ${product.compareAtPrice.toFixed(2)}
+                              ${product.compare_at_price.toFixed(2)}
                             </p>
                           )}
                         </div>
@@ -152,19 +174,19 @@ export default function AdminProducts() {
 
                       {/* Shipping */}
                       <TableCell>
-                        {product.isFreeShipping ? (
+                        {product.is_free_shipping ? (
                           <Badge variant="secondary">Free</Badge>
                         ) : (
-                          <span>${product.shippingCost.toFixed(2)}</span>
+                          <span>${(product.shipping_cost ?? 0).toFixed(2)}</span>
                         )}
                       </TableCell>
 
                       {/* Status */}
                       <TableCell>
                         <Badge
-                          variant={product.isActive ? 'default' : 'secondary'}
+                          variant={product.is_active ? 'default' : 'secondary'}
                         >
-                          {product.isActive ? 'Active' : 'Inactive'}
+                          {product.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
 
@@ -196,7 +218,10 @@ export default function AdminProducts() {
                               Edit
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleDelete(product)}
+                            >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
                             </DropdownMenuItem>
@@ -216,6 +241,7 @@ export default function AdminProducts() {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         product={editingProduct}
+        onSuccess={loadProducts}
       />
     </AdminLayout>
   )

@@ -18,12 +18,14 @@ interface ProductFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   product: Product | null
+  onSuccess?: () => void
 }
 
 export function ProductFormDialog({
   open,
   onOpenChange,
   product,
+  onSuccess,
 }: ProductFormDialogProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,11 +35,11 @@ export function ProductFormDialog({
     slug: '',
     description: '',
     price: '',
-    compareAtPrice: '',
-    shippingCost: '',
-    isFreeShipping: false,
-    isActive: true,
-    isFeatured: false,
+    compare_at_price: '',
+    shipping_cost: '',
+    is_free_shipping: false,
+    is_active: true,
+    is_featured: false,
   })
 
   /* ------------------ Populate form ------------------ */
@@ -48,11 +50,11 @@ export function ProductFormDialog({
         slug: product.slug,
         description: product.description ?? '',
         price: product.price.toString(),
-        compareAtPrice: product.compareAtPrice?.toString() ?? '',
-        shippingCost: product.shippingCost.toString(),
-        isFreeShipping: product.isFreeShipping,
-        isActive: product.isActive,
-        isFeatured: product.isFeatured,
+        compare_at_price: product.compare_at_price?.toString() ?? '',
+        shipping_cost: product.shipping_cost?.toString() ?? '0',
+        is_free_shipping: product.is_free_shipping,
+        is_active: product.is_active,
+        is_featured: product.is_featured,
       })
     } else {
       setForm({
@@ -60,11 +62,11 @@ export function ProductFormDialog({
         slug: '',
         description: '',
         price: '',
-        compareAtPrice: '',
-        shippingCost: '',
-        isFreeShipping: false,
-        isActive: true,
-        isFeatured: false,
+        compare_at_price: '',
+        shipping_cost: '',
+        is_free_shipping: false,
+        is_active: true,
+        is_featured: false,
       })
     }
   }, [product])
@@ -80,15 +82,15 @@ export function ProductFormDialog({
         slug: form.slug.trim(),
         description: form.description || null,
         price: Number(form.price),
-        compareAtPrice: form.compareAtPrice
-          ? Number(form.compareAtPrice)
+        compare_at_price: form.compare_at_price
+          ? Number(form.compare_at_price)
           : null,
-        shippingCost: form.isFreeShipping
+        shipping_cost: form.is_free_shipping
           ? 0
-          : Number(form.shippingCost || 0),
-        isFreeShipping: form.isFreeShipping,
-        isActive: form.isActive,
-        isFeatured: form.isFeatured,
+          : Number(form.shipping_cost || 0),
+        is_free_shipping: form.is_free_shipping,
+        is_active: form.is_active,
+        is_featured: form.is_featured,
       }
 
       if (product) {
@@ -103,6 +105,7 @@ export function ProductFormDialog({
       })
 
       onOpenChange(false)
+      onSuccess?.()
     } catch (err) {
       console.error(err)
       toast({
@@ -196,11 +199,11 @@ export function ProductFormDialog({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={form.compareAtPrice}
+                  value={form.compare_at_price}
                   onChange={(e) =>
                     setForm((p) => ({
                       ...p,
-                      compareAtPrice: e.target.value,
+                      compare_at_price: e.target.value,
                     }))
                   }
                 />
@@ -212,12 +215,12 @@ export function ProductFormDialog({
                   type="number"
                   step="0.01"
                   min="0"
-                  disabled={form.isFreeShipping}
-                  value={form.shippingCost}
+                  disabled={form.is_free_shipping}
+                  value={form.shipping_cost}
                   onChange={(e) =>
                     setForm((p) => ({
                       ...p,
-                      shippingCost: e.target.value,
+                      shipping_cost: e.target.value,
                     }))
                   }
                 />
@@ -227,9 +230,9 @@ export function ProductFormDialog({
             {/* Toggles */}
             <div className="space-y-4 pt-4 border-t">
               {[
-                ['Free Shipping', 'isFreeShipping'],
-                ['Active', 'isActive'],
-                ['Featured', 'isFeatured'],
+                ['Free Shipping', 'is_free_shipping'],
+                ['Active', 'is_active'],
+                ['Featured', 'is_featured'],
               ].map(([label, key]) => (
                 <div
                   key={key}

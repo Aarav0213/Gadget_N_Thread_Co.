@@ -4,11 +4,12 @@ import { ArrowRight, Truck, Shield, Headphones } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
 import { ProductGrid } from '@/components/products/ProductGrid';
-import { mockProducts, mockCategories } from '@/lib/mockData';
 
 const Index = () => {
-  const featuredProducts = mockProducts.filter((p) => p.isFeatured).slice(0, 4);
-  const newArrivals = mockProducts.slice(0, 8);
+  // Replace mock data with empty arrays for now
+  const featuredProducts: any[] = [];
+  const newArrivals: any[] = [];
+  const categories: any[] = [];
 
   return (
     <Layout>
@@ -42,7 +43,6 @@ const Index = () => {
           </motion.div>
         </div>
 
-        {/* Decorative Element */}
         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
       </section>
 
@@ -108,7 +108,7 @@ const Index = () => {
             <p className="text-muted-foreground mt-2">Find exactly what you're looking for</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {mockCategories.map((category, index) => (
+            {categories.map((category, index) => (
               <motion.div
                 key={category.id}
                 initial={{ opacity: 0, y: 20 }}

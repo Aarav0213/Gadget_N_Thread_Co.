@@ -25,22 +25,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export const authApi = {
   login: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     return data
   },
 
   register: async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) throw error
 
-    // 🔑 CREATE / UPDATE PROFILE ON SIGNUP
     if (data.user) {
       await profilesApi.upsert({
         id: data.user.id,
@@ -66,7 +59,7 @@ export const authApi = {
 }
 
 /* =======================
-   PROFILES  🔥 (CRITICAL)
+   PROFILES (CRITICAL)
 ======================= */
 
 export const profilesApi = {
@@ -100,51 +93,6 @@ export const profilesApi = {
 }
 
 /* =======================
-   CATEGORIES
-======================= */
-
-export const categoriesApi = {
-  list: async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
-
-    if (error) throw error
-    return data
-  },
-
-  create: async (category: Partial<Category>) => {
-    const { data, error } = await supabase
-      .from('categories')
-      .insert(category)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  },
-
-  update: async (id: string, category: Partial<Category>) => {
-    const { data, error } = await supabase
-      .from('categories')
-      .update(category)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  },
-
-  delete: async (id: string) => {
-    const { error } = await supabase.from('categories').delete().eq('id', id)
-    if (error) throw error
-  },
-}
-
-/* =======================
    PRODUCTS
 ======================= */
 
@@ -152,11 +100,7 @@ export const productsApi = {
   list: async () => {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        category:categories(*),
-        images:product_images(*)
-      `)
+      .select(`*, category:categories(*), images:product_images(*)`)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
 
@@ -167,11 +111,7 @@ export const productsApi = {
   getBySlug: async (slug: string) => {
     const { data, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        category:categories(*),
-        images:product_images(*)
-      `)
+      .select(`*, category:categories(*), images:product_images(*)`)
       .eq('slug', slug)
       .single()
 
@@ -181,30 +121,31 @@ export const productsApi = {
 }
 
 /* =======================
-   CART
+   REVIEWS ✅ (FIX)
 ======================= */
 
-export const cartApi = {
-  get: async (userId: string) => {
+export const reviewsApi = {
+  listForProduct: async (productId: string) => {
     const { data, error } = await supabase
-      .from('cart_items')
-      .select(`
-        *,
-        product:products(
-          *,
-          images:product_images(*)
-        )
-      `)
-      .eq('user_id', userId)
+      .from('reviews')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     return data
   },
 
-  add: async (userId: string, productId: string, quantity: number) => {
+  create: async (productId: string, rating: number, content: string, title?: string) => {
     const { data, error } = await supabase
-      .from('cart_items')
-      .insert({ user_id: userId, product_id: productId, quantity })
+      .from('reviews')
+      .insert({
+        product_id: productId,
+        rating,
+        content,
+        title,
+      })
       .select()
       .single()
 
@@ -217,21 +158,10 @@ export const cartApi = {
    TYPES
 ======================= */
 
-export interface UserProfile {
-  id: string
-  email: string
-  full_name?: string
-  phone?: string
-  role: 'admin' | 'customer'
-}
-
 export interface Category {
   id: string
   name: string
   slug: string
-  description?: string
-  image_url?: string
-  display_order: number
   is_active: boolean
 }
 
@@ -256,5 +186,13 @@ export interface Product {
   is_featured: boolean
   category?: Category
   images: ProductImage[]
-  created_at?: string
+}
+
+export interface Review {
+  id: string
+  product_id: string
+  rating: number
+  title?: string
+  content: string
+  created_at: string
 }

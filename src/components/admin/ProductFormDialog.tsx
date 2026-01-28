@@ -1,28 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
-import type { Product } from '@/lib/api';
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/hooks/use-toast'
+import { productsApi } from '@/lib/api'
+import type { Product } from '@/lib/api'
 
 interface ProductFormDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  product: Product | null;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  product: Product | null
 }
 
-export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDialogProps) {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
+export function ProductFormDialog({
+  open,
+  onOpenChange,
+  product,
+}: ProductFormDialogProps) {
+  const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const [form, setForm] = useState({
     name: '',
     slug: '',
@@ -33,21 +38,22 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
     isFreeShipping: false,
     isActive: true,
     isFeatured: false,
-  });
+  })
 
+  /* ------------------ Populate form ------------------ */
   useEffect(() => {
     if (product) {
       setForm({
         name: product.name,
         slug: product.slug,
-        description: product.description || '',
+        description: product.description ?? '',
         price: product.price.toString(),
-        compareAtPrice: product.compareAtPrice?.toString() || '',
+        compareAtPrice: product.compareAtPrice?.toString() ?? '',
         shippingCost: product.shippingCost.toString(),
         isFreeShipping: product.isFreeShipping,
         isActive: product.isActive,
         isFeatured: product.isFeatured,
-      });
+      })
     } else {
       setForm({
         name: '',
@@ -59,181 +65,217 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
         isFreeShipping: false,
         isActive: true,
         isFeatured: false,
-      });
+      })
     }
-  }, [product]);
+  }, [product])
 
+  /* ------------------ Submit ------------------ */
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    e.preventDefault()
+    setIsSubmitting(true)
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const payload = {
+        name: form.name.trim(),
+        slug: form.slug.trim(),
+        description: form.description || null,
+        price: Number(form.price),
+        compareAtPrice: form.compareAtPrice
+          ? Number(form.compareAtPrice)
+          : null,
+        shippingCost: form.isFreeShipping
+          ? 0
+          : Number(form.shippingCost || 0),
+        isFreeShipping: form.isFreeShipping,
+        isActive: form.isActive,
+        isFeatured: form.isFeatured,
+      }
+
+      if (product) {
+        await productsApi.update(product.id, payload)
+      } else {
+        await productsApi.create(payload)
+      }
+
       toast({
         title: product ? 'Product updated' : 'Product created',
-        description: `${form.name} has been ${product ? 'updated' : 'created'} successfully.`,
-      });
-      
-      onOpenChange(false);
-    } catch (error) {
+        description: `${payload.name} saved successfully.`,
+      })
+
+      onOpenChange(false)
+    } catch (err) {
+      console.error(err)
       toast({
         title: 'Error',
-        description: 'Failed to save product. Please try again.',
+        description: 'Failed to save product. Check console for details.',
         variant: 'destructive',
-      });
+      })
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
-  const generateSlug = (name: string) => {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-  };
+  /* ------------------ Helpers ------------------ */
+  const generateSlug = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
 
+  /* ------------------ UI ------------------ */
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{product ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+          <DialogTitle>
+            {product ? 'Edit Product' : 'Add New Product'}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-4">
+            {/* Name + Slug */}
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name">Product Name *</Label>
+                <Label>Product Name *</Label>
                 <Input
-                  id="name"
                   value={form.name}
-                  onChange={(e) => {
-                    setForm(prev => ({
-                      ...prev,
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
                       name: e.target.value,
                       slug: generateSlug(e.target.value),
-                    }));
-                  }}
+                    }))
+                  }
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="slug">URL Slug *</Label>
+                <Label>URL Slug *</Label>
                 <Input
-                  id="slug"
                   value={form.slug}
-                  onChange={(e) => setForm(prev => ({ ...prev, slug: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, slug: e.target.value }))
+                  }
                   required
                 />
               </div>
             </div>
 
+            {/* Description */}
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label>Description</Label>
               <Textarea
-                id="description"
-                value={form.description}
-                onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
                 rows={4}
+                value={form.description}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, description: e.target.value }))
+                }
               />
             </div>
 
+            {/* Pricing */}
             <div className="grid sm:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="price">Price *</Label>
+                <Label>Price *</Label>
                 <Input
-                  id="price"
                   type="number"
                   step="0.01"
                   min="0"
                   value={form.price}
-                  onChange={(e) => setForm(prev => ({ ...prev, price: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, price: e.target.value }))
+                  }
                   required
                 />
               </div>
+
               <div>
-                <Label htmlFor="compareAtPrice">Compare at Price</Label>
+                <Label>Compare at Price</Label>
                 <Input
-                  id="compareAtPrice"
                   type="number"
                   step="0.01"
                   min="0"
                   value={form.compareAtPrice}
-                  onChange={(e) => setForm(prev => ({ ...prev, compareAtPrice: e.target.value }))}
-                  placeholder="Original price"
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      compareAtPrice: e.target.value,
+                    }))
+                  }
                 />
               </div>
+
               <div>
-                <Label htmlFor="shippingCost">Shipping Cost</Label>
+                <Label>Shipping Cost</Label>
                 <Input
-                  id="shippingCost"
                   type="number"
                   step="0.01"
                   min="0"
-                  value={form.shippingCost}
-                  onChange={(e) => setForm(prev => ({ ...prev, shippingCost: e.target.value }))}
                   disabled={form.isFreeShipping}
+                  value={form.shippingCost}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      shippingCost: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </div>
 
+            {/* Toggles */}
             <div className="space-y-4 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="isFreeShipping">Free Shipping</Label>
-                  <p className="text-sm text-muted-foreground">Offer free shipping on this product</p>
+              {[
+                ['Free Shipping', 'isFreeShipping'],
+                ['Active', 'isActive'],
+                ['Featured', 'isFeatured'],
+              ].map(([label, key]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between"
+                >
+                  <Label>{label}</Label>
+                  <Switch
+                    checked={(form as any)[key]}
+                    onCheckedChange={(checked) =>
+                      setForm((p) => ({ ...p, [key]: checked }))
+                    }
+                  />
                 </div>
-                <Switch
-                  id="isFreeShipping"
-                  checked={form.isFreeShipping}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, isFreeShipping: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="isActive">Active</Label>
-                  <p className="text-sm text-muted-foreground">Show this product in the store</p>
-                </div>
-                <Switch
-                  id="isActive"
-                  checked={form.isActive}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, isActive: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="isFeatured">Featured</Label>
-                  <p className="text-sm text-muted-foreground">Show on homepage featured section</p>
-                </div>
-                <Switch
-                  id="isFeatured"
-                  checked={form.isFeatured}
-                  onCheckedChange={(checked) => setForm(prev => ({ ...prev, isFeatured: checked }))}
-                />
-              </div>
+              ))}
             </div>
 
+            {/* Images (placeholder) */}
             <div className="pt-4 border-t">
               <Label>Product Images</Label>
-              <div className="mt-2 border-2 border-dashed rounded-lg p-8 text-center">
-                <p className="text-muted-foreground text-sm">
-                  Image upload will be available when connected to your backend storage.
+              <div className="mt-2 border-2 border-dashed rounded-lg p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Image uploads wired after storage setup.
                 </p>
               </div>
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : (product ? 'Update Product' : 'Create Product')}
+              {isSubmitting
+                ? 'Saving…'
+                : product
+                ? 'Update Product'
+                : 'Create Product'}
             </Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

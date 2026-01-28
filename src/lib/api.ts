@@ -59,7 +59,7 @@ export const authApi = {
 }
 
 /* =======================
-   PROFILES (CRITICAL)
+   PROFILES
 ======================= */
 
 export const profilesApi = {
@@ -86,6 +86,23 @@ export const profilesApi = {
       .upsert(profile)
       .select()
       .single()
+
+    if (error) throw error
+    return data
+  },
+}
+
+/* =======================
+   CATEGORIES
+======================= */
+
+export const categoriesApi = {
+  list: async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order')
 
     if (error) throw error
     return data
@@ -121,7 +138,7 @@ export const productsApi = {
 }
 
 /* =======================
-   REVIEWS ✅ (FIX)
+   REVIEWS
 ======================= */
 
 export const reviewsApi = {
@@ -136,18 +153,19 @@ export const reviewsApi = {
     if (error) throw error
     return data
   },
+}
 
-  create: async (productId: string, rating: number, content: string, title?: string) => {
+/* =======================
+   ORDERS ✅ FIX
+======================= */
+
+export const ordersApi = {
+  listForUser: async (userId: string) => {
     const { data, error } = await supabase
-      .from('reviews')
-      .insert({
-        product_id: productId,
-        rating,
-        content,
-        title,
-      })
-      .select()
-      .single()
+      .from('orders')
+      .select(`*, items:order_items(*)`)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
     if (error) throw error
     return data
@@ -162,7 +180,6 @@ export interface Category {
   id: string
   name: string
   slug: string
-  is_active: boolean
 }
 
 export interface ProductImage {
@@ -183,7 +200,6 @@ export interface Product {
   is_free_shipping: boolean
   is_in_stock: boolean
   is_active: boolean
-  is_featured: boolean
   category?: Category
   images: ProductImage[]
 }
@@ -192,7 +208,13 @@ export interface Review {
   id: string
   product_id: string
   rating: number
-  title?: string
   content: string
+  created_at: string
+}
+
+export interface Order {
+  id: string
+  status: string
+  grand_total: number
   created_at: string
 }

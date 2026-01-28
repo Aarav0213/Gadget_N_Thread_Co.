@@ -111,7 +111,7 @@ const Cart = () => {
                       className="flex-shrink-0"
                     >
                       <img
-                        src={item.product.images[0]?.imageUrl}
+                        src={item.product.images?.[0]?.image_url}
                         alt={item.product.name}
                         className="w-24 h-24 object-cover rounded-md"
                       />
@@ -128,11 +128,11 @@ const Cart = () => {
                       <p className="text-sm text-muted-foreground mt-1">
                         ${item.product.price.toFixed(2)} each
                       </p>
-                      {item.product.isFreeShipping ? (
+                      {item.product.is_free_shipping ? (
                         <p className="text-sm text-green-600 mt-1">Free Shipping</p>
                       ) : (
                         <p className="text-sm text-muted-foreground mt-1">
-                          +${item.product.shippingCost.toFixed(2)} shipping
+                          +${(item.product.shipping_cost ?? 0).toFixed(2)} shipping
                         </p>
                       )}
 

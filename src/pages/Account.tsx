@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,44 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { User, Package, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { ordersApi } from '@/lib/api';
+import type { Order } from '@/lib/api';
 
-// Mock orders data
-const mockOrders = [
-  {
-    id: '1',
-    orderNumber: 'GT-ABC123',
-    status: 'delivered' as const,
-    grandTotal: 299.99,
-    createdAt: '2024-01-15T10:30:00Z',
-    items: [
-      { id: '1', productName: 'Wireless Headphones', quantity: 1, unitPrice: 199.99, totalPrice: 199.99 },
-      { id: '2', productName: 'Phone Case', quantity: 2, unitPrice: 50.00, totalPrice: 100.00 },
-    ],
-  },
-  {
-    id: '2',
-    orderNumber: 'GT-DEF456',
-    status: 'shipped' as const,
-    grandTotal: 149.99,
-    createdAt: '2024-01-20T14:00:00Z',
-    items: [
-      { id: '3', productName: 'Bluetooth Speaker', quantity: 1, unitPrice: 149.99, totalPrice: 149.99 },
-    ],
-    trackingNumber: '1Z999AA10123456784',
-  },
-  {
-    id: '3',
-    orderNumber: 'GT-GHI789',
-    status: 'processing' as const,
-    grandTotal: 79.99,
-    createdAt: '2024-01-22T09:15:00Z',
-    items: [
-      { id: '4', productName: 'USB-C Cable Pack', quantity: 3, unitPrice: 26.66, totalPrice: 79.99 },
-    ],
-  },
-];
-
-const statusColors = {
+const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   processing: 'bg-blue-100 text-blue-800',
   shipped: 'bg-purple-100 text-purple-800',
@@ -61,12 +27,32 @@ export default function Account() {
   const { toast } = useToast();
   const { isAuthenticated, user, logout } = useAuthStore();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
   
   const [profile, setProfile] = useState({
     fullName: user?.fullName || '',
     email: user?.email || '',
-    phone: user?.phone || '',
+    phone: '',
   });
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadOrders();
+    }
+  }, [isAuthenticated]);
+
+  const loadOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const data = await ordersApi.list();
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -91,7 +77,7 @@ export default function Account() {
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',
       });
-    } catch (error) {
+    } catch {
       toast({
         title: 'Update failed',
         description: 'There was an error updating your profile.',
@@ -145,7 +131,9 @@ export default function Account() {
                 <CardDescription>View and track your orders</CardDescription>
               </CardHeader>
               <CardContent>
-                {mockOrders.length === 0 ? (
+                {loadingOrders ? (
+                  <p className="text-muted-foreground text-center py-8">Loading orders...</p>
+                ) : orders.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">No orders yet</p>
@@ -155,16 +143,16 @@ export default function Account() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {mockOrders.map((order) => (
+                    {orders.map((order) => (
                       <div
                         key={order.id}
                         className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
                           <div>
-                            <p className="font-medium">Order #{order.orderNumber}</p>
+                            <p className="font-medium">Order #{order.order_number}</p>
                             <p className="text-sm text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleDateString('en-US', {
+                              {new Date(order.created_at).toLocaleDateString('en-US', {
                                 year: 'numeric',
                                 month: 'long',
                                 day: 'numeric',
@@ -172,25 +160,25 @@ export default function Account() {
                             </p>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge className={statusColors[order.status]}>
+                            <Badge className={statusColors[order.status] || 'bg-gray-100 text-gray-800'}>
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                             </Badge>
-                            <span className="font-bold">${order.grandTotal.toFixed(2)}</span>
+                            <span className="font-bold">${order.grand_total.toFixed(2)}</span>
                           </div>
                         </div>
                         
                         <div className="space-y-1 text-sm">
-                          {order.items.map((item) => (
+                          {order.items?.map((item) => (
                             <p key={item.id} className="text-muted-foreground">
-                              {item.quantity}x {item.productName}
+                              {item.quantity}x {item.product_name}
                             </p>
                           ))}
                         </div>
                         
-                        {order.trackingNumber && (
+                        {order.tracking_number && (
                           <p className="mt-3 text-sm">
                             <span className="text-muted-foreground">Tracking: </span>
-                            <span className="font-mono">{order.trackingNumber}</span>
+                            <span className="font-mono">{order.tracking_number}</span>
                           </p>
                         )}
                       </div>

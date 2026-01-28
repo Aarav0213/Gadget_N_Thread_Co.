@@ -22,7 +22,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StarRating } from '@/components/products/StarRating';
 import { ProductGrid } from '@/components/products/ProductGrid';
 import { useCartStore } from '@/stores/cartStore';
-import { mockProducts, mockReviews } from '@/lib/mockData';
+import { productsApi, reviewsApi } from '@/lib/api';
+import type { Product, Review } from '@/lib/api';
 import { toast } from 'sonner';
 
 const ProductDetail = () => {
@@ -30,16 +31,55 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const addItem = useCartStore((state) => state.addItem);
 
-  const product = mockProducts.find((p) => p.slug === slug);
-
+  const [product, setProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Reset state when navigating between products
   useEffect(() => {
+    const fetchData = async () => {
+      if (!slug) return;
+      
+      setLoading(true);
+      try {
+        const productData = await productsApi.getBySlug(slug);
+        setProduct(productData);
+
+        // Fetch reviews
+        if (productData?.id) {
+          const reviewsData = await reviewsApi.listForProduct(productData.id);
+          setReviews(reviewsData || []);
+        }
+
+        // Fetch related products
+        const allProducts = await productsApi.list();
+        const related = allProducts
+          ?.filter((p: Product) => p.category_id === productData?.category_id && p.id !== productData?.id)
+          .slice(0, 4) || [];
+        setRelatedProducts(related);
+      } catch (error) {
+        console.error('Error fetching product:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
     setQuantity(1);
     setCurrentImageIndex(0);
   }, [slug]);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <p className="text-muted-foreground">Loading product...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!product) {
     return (
@@ -62,29 +102,21 @@ const ProductDetail = () => {
     : [
         {
           id: 'placeholder',
-          imageUrl: '/placeholder.png',
-          altText: product.name,
+          image_url: '/placeholder.svg',
+          alt_text: product.name,
+          display_order: 0,
+          is_primary: true,
         },
       ];
 
-  const reviews = mockReviews[product.id] || [];
-
-  const relatedProducts = mockProducts
-    .filter(
-      (p) =>
-        p.categoryId === product.categoryId &&
-        p.id !== product.id
-    )
-    .slice(0, 4);
-
   const hasDiscount =
-    typeof product.compareAtPrice === 'number' &&
-    product.compareAtPrice > product.price;
+    typeof product.compare_at_price === 'number' &&
+    product.compare_at_price > product.price;
 
   const discountPercent = hasDiscount
     ? Math.round(
-        ((product.compareAtPrice! - product.price) /
-          product.compareAtPrice!) *
+        ((product.compare_at_price! - product.price) /
+          product.compare_at_price!) *
           100
       )
     : 0;
@@ -136,8 +168,8 @@ const ProductDetail = () => {
               <AnimatePresence mode="wait">
                 <motion.img
                   key={currentImageIndex}
-                  src={images[currentImageIndex].imageUrl}
-                  alt={images[currentImageIndex].altText}
+                  src={images[currentImageIndex].image_url}
+                  alt={images[currentImageIndex].alt_text || product.name}
                   className="h-full w-full object-cover"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -171,7 +203,7 @@ const ProductDetail = () => {
                 {hasDiscount && (
                   <Badge variant="destructive">-{discountPercent}% OFF</Badge>
                 )}
-                {product.isFreeShipping && (
+                {product.is_free_shipping && (
                   <Badge variant="secondary">Free Shipping</Badge>
                 )}
               </div>
@@ -190,8 +222,8 @@ const ProductDetail = () => {
                     }`}
                   >
                     <img
-                      src={image.imageUrl}
-                      alt={image.altText}
+                      src={image.image_url}
+                      alt={image.alt_text || product.name}
                       className="h-full w-full object-cover"
                     />
                   </button>
@@ -208,14 +240,14 @@ const ProductDetail = () => {
               </p>
               <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
 
-              {typeof product.averageRating === 'number' && (
+              {typeof product.average_rating === 'number' && (
                 <div className="flex items-center gap-2 mb-4">
-                  <StarRating rating={product.averageRating} size="md" />
+                  <StarRating rating={product.average_rating} size="md" />
                   <span className="text-sm font-medium">
-                    {product.averageRating.toFixed(1)}
+                    {product.average_rating.toFixed(1)}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    ({product.reviewCount} reviews)
+                    ({product.review_count} reviews)
                   </span>
                 </div>
               )}
@@ -226,7 +258,7 @@ const ProductDetail = () => {
                 </span>
                 {hasDiscount && (
                   <span className="text-xl text-muted-foreground line-through">
-                    ${product.compareAtPrice!.toFixed(2)}
+                    ${product.compare_at_price!.toFixed(2)}
                   </span>
                 )}
               </div>
@@ -268,10 +300,10 @@ const ProductDetail = () => {
                   size="lg"
                   className="flex-1 gap-2"
                   onClick={handleAddToCart}
-                  disabled={!product.isInStock}
+                  disabled={!product.is_in_stock}
                 >
                   <ShoppingBag className="h-5 w-5" />
-                  {product.isInStock ? 'Add to Cart' : 'Out of Stock'}
+                  {product.is_in_stock ? 'Add to Cart' : 'Out of Stock'}
                 </Button>
                 <Button size="lg" variant="outline">
                   <Heart className="h-5 w-5" />
@@ -287,12 +319,12 @@ const ProductDetail = () => {
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
                 <Truck className="h-5 w-5 text-muted-foreground" />
-                {product.isFreeShipping ? (
+                {product.is_free_shipping ? (
                   <span>Free shipping on this item</span>
                 ) : (
                   <span>
                     Shipping: $
-                    {(product.shippingCost ?? 0).toFixed(2)}
+                    {(product.shipping_cost ?? 0).toFixed(2)}
                   </span>
                 )}
               </div>
@@ -346,9 +378,9 @@ const ProductDetail = () => {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium">
-                              {review.userName}
+                              {review.user_name || 'Anonymous'}
                             </span>
-                            {review.isVerifiedPurchase && (
+                            {review.is_verified_purchase && (
                               <Badge variant="secondary" className="text-xs">
                                 Verified Purchase
                               </Badge>
@@ -357,7 +389,7 @@ const ProductDetail = () => {
                           <StarRating rating={review.rating} size="sm" />
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {new Date(review.createdAt).toLocaleDateString()}
+                          {new Date(review.created_at).toLocaleDateString()}
                         </span>
                       </div>
                       {review.title && (

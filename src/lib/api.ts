@@ -1,4 +1,19 @@
-import { supabase } from './supabase'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+})
 
 /* =======================
    AUTH
@@ -64,6 +79,34 @@ export const categoriesApi = {
     if (error) throw error
     return data
   },
+
+  create: async (category: Partial<Category>) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert(category)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  update: async (id: string, category: Partial<Category>) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .update(category)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw error
+  },
 }
 
 /* =======================
@@ -111,6 +154,34 @@ export const productsApi = {
 
     if (error) throw error
     return data
+  },
+
+  create: async (product: Partial<Product>) => {
+    const { data, error } = await supabase
+      .from('products')
+      .insert(product)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  update: async (id: string, product: Partial<Product>) => {
+    const { data, error } = await supabase
+      .from('products')
+      .update(product)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) throw error
   },
 }
 
@@ -203,6 +274,30 @@ export const ordersApi = {
     if (error) throw error
     return data
   },
+
+  updateStatus: async (id: string, status: string) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  addTracking: async (id: string, trackingNumber: string, trackingUrl?: string) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ tracking_number: trackingNumber, tracking_url: trackingUrl })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
 }
 
 /* =======================
@@ -245,8 +340,80 @@ export const reviewsApi = {
 }
 
 /* =======================
+   MESSAGES & CONVERSATIONS
+======================= */
+
+export const messagesApi = {
+  listConversations: async () => {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .order('last_message_at', { ascending: false })
+
+    if (error) throw error
+    return data
+  },
+
+  getMessages: async (conversationId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data
+  },
+
+  sendMessage: async (conversationId: string, content: string, senderType: 'admin' | 'customer') => {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        content,
+        sender_type: senderType,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  updateConversationStatus: async (id: string, status: 'open' | 'resolved') => {
+    const { data, error } = await supabase
+      .from('conversations')
+      .update({ status })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+}
+
+/* =======================
    TYPES (FRONTEND)
 ======================= */
+
+export interface User {
+  id: string
+  email: string
+  fullName: string
+  role: 'admin' | 'customer'
+}
+
+export interface Address {
+  fullName: string
+  addressLine1: string
+  addressLine2?: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+  phone?: string
+}
 
 export interface Category {
   id: string
@@ -278,8 +445,12 @@ export interface Product {
   is_in_stock: boolean
   is_active: boolean
   is_featured: boolean
+  average_rating?: number
+  review_count?: number
+  category_id?: string
   category?: Category
   images: ProductImage[]
+  created_at?: string
 }
 
 export interface CartItem {
@@ -287,6 +458,15 @@ export interface CartItem {
   product_id: string
   quantity: number
   product: Product
+}
+
+export interface OrderItem {
+  id: string
+  product_name: string
+  product_image_url?: string
+  quantity: number
+  unit_price: number
+  total_price: number
 }
 
 export interface Order {
@@ -299,21 +479,39 @@ export interface Order {
   grand_total: number
   created_at: string
   items: OrderItem[]
-}
-
-export interface OrderItem {
-  id: string
-  product_name: string
-  quantity: number
-  unit_price: number
-  total_price: number
+  shipping_address?: Address
+  tracking_number?: string
+  tracking_url?: string
 }
 
 export interface Review {
   id: string
   product_id: string
+  user_id?: string
+  user_name?: string
   rating: number
   title?: string
   content: string
+  is_verified_purchase?: boolean
+  created_at: string
+}
+
+export interface Conversation {
+  id: string
+  user_id: string
+  product_id?: string
+  subject: string
+  status: 'open' | 'resolved'
+  last_message_at: string
+  created_at: string
+}
+
+export interface Message {
+  id: string
+  conversation_id: string
+  sender_id: string
+  sender_type: 'admin' | 'customer'
+  content: string
+  is_read: boolean
   created_at: string
 }

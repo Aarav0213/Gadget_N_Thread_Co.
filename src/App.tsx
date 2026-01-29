@@ -35,19 +35,20 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const { login, logout } = useAuthStore();
+  const { setUser, logout } = useAuthStore();
 
-  // Sync Supabase auth session with Zustand
   useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
+    // Get current session on load
+    supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
-        login(data.session.user, data.session.access_token);
+        setUser(data.session.user);
       }
     });
 
+    // Listen for auth state changes
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        login(session.user, session.access_token);
+        setUser(session.user);
       } else {
         logout();
       }
@@ -56,7 +57,7 @@ const App = () => {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [login, logout]);
+  }, [setUser, logout]);
 
   return (
     <QueryClientProvider client={queryClient}>

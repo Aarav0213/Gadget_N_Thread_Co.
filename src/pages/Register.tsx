@@ -15,19 +15,21 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/authstore';
 import { toast } from 'sonner';
 import type { User } from '@/lib/api';
 
-const registerSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ['confirmPassword'],
-});
+const registerSchema = z
+  .object({
+    fullName: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.string().email('Please enter a valid email'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -35,7 +37,7 @@ const Register = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -49,11 +51,11 @@ const Register = () => {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
-    
+
     try {
       // Mock registration - replace with actual API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       // Mock user data
       const mockUser: User = {
         id: 'user-new',
@@ -63,8 +65,8 @@ const Register = () => {
         role: 'customer',
         created_at: new Date().toISOString(),
       };
-      
-      login(mockUser, 'mock-jwt-token');
+
+      setUser(mockUser); // <-- updated to use setUser
       toast.success('Account created successfully!');
       navigate('/');
     } catch (error) {
@@ -108,11 +110,7 @@ const Register = () => {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="you@example.com"
-                        {...field}
-                      />
+                      <Input type="email" placeholder="you@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -139,11 +137,7 @@ const Register = () => {
                           className="absolute right-0 top-0 h-full px-3"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </FormControl>

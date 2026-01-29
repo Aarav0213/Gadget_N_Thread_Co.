@@ -39,13 +39,13 @@ export default function AdminMessages() {
   const loadConversations = async () => {
     try {
       setLoading(true);
-      const data = await messagesApi.listConversations();
+      const data = await messagesApi.getConversations();
       // Map to include display fields
       const mapped: ConversationWithMeta[] = (data || []).map((conv: Conversation) => ({
         ...conv,
         customerName: `Customer ${conv.user_id?.slice(0, 8) || 'Unknown'}`,
-        lastMessage: conv.subject || 'No message',
-        unread: 0,
+        lastMessage: conv.last_message || conv.subject || 'No message',
+        unread: conv.unread_count || 0,
       }));
       setConversations(mapped);
     } catch (error) {
@@ -57,8 +57,8 @@ export default function AdminMessages() {
 
   const loadMessages = async (conversationId: string) => {
     try {
-      const data = await messagesApi.getMessages(conversationId);
-      setMessages(data || []);
+      const conv = await messagesApi.getConversation(conversationId);
+      setMessages(conv.messages || []);
     } catch (error) {
       console.error('Failed to load messages:', error);
     }
@@ -73,7 +73,11 @@ export default function AdminMessages() {
     if (!replyText.trim() || !selectedConversation) return;
 
     try {
-      await messagesApi.sendMessage(selectedConversation.id, replyText, 'admin');
+      await messagesApi.sendMessage({
+        conversation_id: selectedConversation.id,
+        sender_id: 'admin',
+        content: replyText,
+      });
       setReplyText('');
       loadMessages(selectedConversation.id);
       
@@ -104,6 +108,11 @@ export default function AdminMessages() {
     } catch (error) {
       console.error('Failed to resolve conversation:', error);
     }
+  };
+
+  // Helper to determine if message is from admin
+  const isAdminMessage = (message: Message) => {
+    return message.sender_id === 'admin';
   };
 
   return (
@@ -162,7 +171,7 @@ export default function AdminMessages() {
                         ) : (
                           <Clock className="h-3 w-3" />
                         )}
-                        {new Date(conv.last_message_at).toLocaleDateString()}
+                        {new Date(conv.updated_at).toLocaleDateString()}
                       </div>
                     </button>
                   ))
@@ -197,18 +206,18 @@ export default function AdminMessages() {
                       {messages.map((message) => (
                         <div
                           key={message.id}
-                          className={`flex ${message.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                          className={`flex ${isAdminMessage(message) ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
                             className={`max-w-[80%] rounded-lg p-3 ${
-                              message.sender_type === 'admin'
+                              isAdminMessage(message)
                                 ? 'bg-primary text-primary-foreground'
                                 : 'bg-muted'
                             }`}
                           >
                             <p className="text-sm">{message.content}</p>
                             <p className={`text-xs mt-1 ${
-                              message.sender_type === 'admin'
+                              isAdminMessage(message)
                                 ? 'text-primary-foreground/70'
                                 : 'text-muted-foreground'
                             }`}>

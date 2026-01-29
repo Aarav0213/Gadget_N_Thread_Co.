@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import type { User } from '@/lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -50,11 +51,13 @@ const Login = () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       
       // Mock user data
-      const mockUser = {
+      const mockUser: User = {
         id: 'user-1',
         email: data.email,
-        fullName: 'John Doe',
-        role: data.email.includes('admin') ? 'admin' as const : 'customer' as const,
+        full_name: 'John Doe',
+        avatar_url: null,
+        role: data.email.includes('admin') ? 'admin' : 'customer',
+        created_at: new Date().toISOString(),
       };
       
       login(mockUser, 'mock-jwt-token');

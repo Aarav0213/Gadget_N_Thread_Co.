@@ -31,21 +31,22 @@ export default function Account() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   
   const [profile, setProfile] = useState({
-    fullName: user?.fullName || '',
+    fullName: user?.full_name || '',
     email: user?.email || '',
     phone: '',
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user?.id) {
       loadOrders();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   const loadOrders = async () => {
+    if (!user?.id) return;
     try {
       setLoadingOrders(true);
-      const data = await ordersApi.list();
+      const data = await ordersApi.getMine(user.id);
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -150,7 +151,7 @@ export default function Account() {
                       >
                         <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
                           <div>
-                            <p className="font-medium">Order #{order.order_number}</p>
+                            <p className="font-medium">Order #{order.order_number || order.id.slice(0, 8)}</p>
                             <p className="text-sm text-muted-foreground">
                               {new Date(order.created_at).toLocaleDateString('en-US', {
                                 year: 'numeric',
@@ -163,7 +164,7 @@ export default function Account() {
                             <Badge className={statusColors[order.status] || 'bg-gray-100 text-gray-800'}>
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                             </Badge>
-                            <span className="font-bold">${order.grand_total.toFixed(2)}</span>
+                            <span className="font-bold">${(order.grand_total || order.total).toFixed(2)}</span>
                           </div>
                         </div>
                         

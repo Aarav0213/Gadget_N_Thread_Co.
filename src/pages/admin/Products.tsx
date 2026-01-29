@@ -66,7 +66,7 @@ export default function AdminProducts() {
     if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return
     
     try {
-      await productsApi.delete(product.id)
+      await productsApi.remove(product.id)
       toast({
         title: 'Product deleted',
         description: `${product.name} has been deleted.`,

@@ -65,7 +65,7 @@ export default function AdminOrders() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await ordersApi.list();
+      const data = await ordersApi.getAll();
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -75,15 +75,14 @@ export default function AdminOrders() {
   };
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (order.shipping_address?.fullName || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (order.order_number || order.id).toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
-      await ordersApi.updateStatus(orderId, newStatus);
+      await ordersApi.update(orderId, { status: newStatus });
       toast({
         title: 'Order updated',
         description: `Order status changed to ${newStatus}.`,
@@ -103,7 +102,9 @@ export default function AdminOrders() {
     if (!trackingForm.number || !selectedOrder) return;
     
     try {
-      await ordersApi.addTracking(selectedOrder.id, trackingForm.number, trackingForm.url || undefined);
+      await ordersApi.update(selectedOrder.id, { 
+        tracking_number: trackingForm.number,
+      });
       toast({
         title: 'Tracking added',
         description: 'Tracking information has been saved.',
@@ -166,7 +167,6 @@ export default function AdminOrders() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order</TableHead>
-                    <TableHead>Customer</TableHead>
                     <TableHead>Items</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Status</TableHead>
@@ -178,21 +178,13 @@ export default function AdminOrders() {
                   {filteredOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">
-                        {order.order_number}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p>{order.shipping_address?.fullName || 'N/A'}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {order.shipping_address?.city}, {order.shipping_address?.state}
-                          </p>
-                        </div>
+                        {order.order_number || order.id.slice(0, 8)}
                       </TableCell>
                       <TableCell>
                         {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
                       </TableCell>
                       <TableCell className="font-medium">
-                        ${order.grand_total.toFixed(2)}
+                        ${(order.grand_total || order.total).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <Select
@@ -238,7 +230,7 @@ export default function AdminOrders() {
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Order {selectedOrder?.order_number}</DialogTitle>
+            <DialogTitle>Order {selectedOrder?.order_number || selectedOrder?.id.slice(0, 8)}</DialogTitle>
           </DialogHeader>
 
           {selectedOrder && (
@@ -252,13 +244,6 @@ export default function AdminOrders() {
                 <div className="space-y-3">
                   {selectedOrder.items?.map((item) => (
                     <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                      {item.product_image_url && (
-                        <img
-                          src={item.product_image_url}
-                          alt={item.product_name}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      )}
                       <div className="flex-1">
                         <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">
@@ -280,61 +265,30 @@ export default function AdminOrders() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span>{selectedOrder.shipping_total === 0 ? 'Free' : `$${selectedOrder.shipping_total.toFixed(2)}`}</span>
+                    <span>{selectedOrder.shipping_cost === 0 ? 'Free' : `$${selectedOrder.shipping_cost.toFixed(2)}`}</span>
                   </div>
-                  {selectedOrder.discount_total > 0 && (
+                  {selectedOrder.discount_amount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span>-${selectedOrder.discount_total.toFixed(2)}</span>
+                      <span>-${selectedOrder.discount_amount.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total</span>
-                    <span>${selectedOrder.grand_total.toFixed(2)}</span>
+                    <span>${(selectedOrder.grand_total || selectedOrder.total).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Shipping Address */}
-              {selectedOrder.shipping_address && (
-                <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3 flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    Shipping Address
-                  </h3>
-                  <div className="text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">{selectedOrder.shipping_address.fullName}</p>
-                    <p>{selectedOrder.shipping_address.addressLine1}</p>
-                    {selectedOrder.shipping_address.addressLine2 && (
-                      <p>{selectedOrder.shipping_address.addressLine2}</p>
-                    )}
-                    <p>
-                      {selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.state} {selectedOrder.shipping_address.postalCode}
-                    </p>
-                    <p>{selectedOrder.shipping_address.country}</p>
-                    {selectedOrder.shipping_address.phone && (
-                      <p className="mt-1">Phone: {selectedOrder.shipping_address.phone}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {/* Tracking */}
               <div className="border-t pt-4">
-                <h3 className="font-medium mb-3">Tracking Information</h3>
+                <h3 className="font-medium mb-3 flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  Tracking Information
+                </h3>
                 {selectedOrder.tracking_number ? (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="font-mono text-sm">{selectedOrder.tracking_number}</p>
-                    {selectedOrder.tracking_url && (
-                      <a
-                        href={selectedOrder.tracking_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Track Package →
-                      </a>
-                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -345,15 +299,6 @@ export default function AdminOrders() {
                         value={trackingForm.number}
                         onChange={(e) => setTrackingForm(prev => ({ ...prev, number: e.target.value }))}
                         placeholder="Enter tracking number"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="trackingUrl">Tracking URL (optional)</Label>
-                      <Input
-                        id="trackingUrl"
-                        value={trackingForm.url}
-                        onChange={(e) => setTrackingForm(prev => ({ ...prev, url: e.target.value }))}
-                        placeholder="https://..."
                       />
                     </div>
                     <Button onClick={handleAddTracking} disabled={!trackingForm.number}>

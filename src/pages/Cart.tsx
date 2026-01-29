@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useCartStore } from '@/stores/cartStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/authstore';
 import { toast } from 'sonner';
 
 const Cart = () => {
   const navigate = useNavigate();
   const [discountInput, setDiscountInput] = useState('');
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
-  
+
   const {
     items,
     discountCode,
@@ -27,23 +27,22 @@ const Cart = () => {
     getShippingTotal,
     getTotal,
   } = useCartStore();
-  
+
   const { isAuthenticated } = useAuthStore();
 
   const handleApplyDiscount = async () => {
     if (!discountInput.trim()) return;
-    
+
     setIsApplyingDiscount(true);
-    
-    // Simulate API call to validate discount code
+
+    // Simulate discount validation
     await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    // Mock discount codes
+
     const mockCodes: Record<string, { percent: number; message: string }> = {
       'WELCOME10': { percent: 10, message: '10% off your first order!' },
       'SAVE20': { percent: 20, message: '20% discount applied!' },
     };
-    
+
     const code = mockCodes[discountInput.toUpperCase()];
     if (code) {
       const discountValue = (getSubtotal() * code.percent) / 100;
@@ -52,7 +51,7 @@ const Cart = () => {
     } else {
       toast.error('Invalid discount code');
     }
-    
+
     setIsApplyingDiscount(false);
     setDiscountInput('');
   };
@@ -93,94 +92,80 @@ const Cart = () => {
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
-          <div className="lg:col-span-2">
-            <div className="space-y-4">
-              <AnimatePresence>
-                {items.map((item) => (
-                  <motion.div
-                    key={item.product.id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    className="flex gap-4 p-4 border rounded-lg"
-                  >
-                    {/* Image */}
+          <div className="lg:col-span-2 space-y-4">
+            <AnimatePresence>
+              {items.map((item) => (
+                <motion.div
+                  key={item.product.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -100 }}
+                  className="flex gap-4 p-4 border rounded-lg"
+                >
+                  <Link to={`/products/${item.product.slug}`} className="flex-shrink-0">
+                    <img
+                      src={item.product.images?.[0]?.image_url}
+                      alt={item.product.name}
+                      className="w-24 h-24 object-cover rounded-md"
+                    />
+                  </Link>
+
+                  <div className="flex-1 min-w-0">
                     <Link
                       to={`/products/${item.product.slug}`}
-                      className="flex-shrink-0"
+                      className="font-medium hover:text-primary transition-colors line-clamp-2"
                     >
-                      <img
-                        src={item.product.images?.[0]?.image_url}
-                        alt={item.product.name}
-                        className="w-24 h-24 object-cover rounded-md"
-                      />
+                      {item.product.name}
                     </Link>
-
-                    {/* Details */}
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/products/${item.product.slug}`}
-                        className="font-medium hover:text-primary transition-colors line-clamp-2"
-                      >
-                        {item.product.name}
-                      </Link>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      ${item.product.price.toFixed(2)} each
+                    </p>
+                    {item.product.is_free_shipping ? (
+                      <p className="text-sm text-green-600 mt-1">Free Shipping</p>
+                    ) : (
                       <p className="text-sm text-muted-foreground mt-1">
-                        ${item.product.price.toFixed(2)} each
+                        +${(item.product.shipping_cost ?? 0).toFixed(2)} shipping
                       </p>
-                      {item.product.is_free_shipping ? (
-                        <p className="text-sm text-green-600 mt-1">Free Shipping</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          +${(item.product.shipping_cost ?? 0).toFixed(2)} shipping
-                        </p>
-                      )}
+                    )}
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-4 mt-3">
-                        <div className="flex items-center border rounded-md">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center text-sm font-medium">
-                            {item.quantity}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="flex items-center border rounded-md">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => removeItem(item.product.id)}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Remove
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
                         </Button>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => removeItem(item.product.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> Remove
+                      </Button>
                     </div>
+                  </div>
 
-                    {/* Price */}
-                    <div className="text-right">
-                      <span className="font-semibold">
-                        ${(item.product.price * item.quantity).toFixed(2)}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                  <div className="text-right font-semibold">
+                    ${(item.product.price * item.quantity).toFixed(2)}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           {/* Order Summary */}
@@ -188,7 +173,7 @@ const Cart = () => {
             <div className="border rounded-lg p-6 sticky top-24">
               <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
 
-              {/* Discount Code */}
+              {/* Discount */}
               <div className="mb-6">
                 {discountCode ? (
                   <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-md">
@@ -233,9 +218,7 @@ const Cart = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span>
-                    {getShippingTotal() === 0 ? 'Free' : `$${getShippingTotal().toFixed(2)}`}
-                  </span>
+                  <span>{getShippingTotal() === 0 ? 'Free' : `$${getShippingTotal().toFixed(2)}`}</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
@@ -250,11 +233,7 @@ const Cart = () => {
                 </div>
               </div>
 
-              <Button
-                size="lg"
-                className="w-full mt-6"
-                onClick={handleCheckout}
-              >
+              <Button size="lg" className="w-full mt-6" onClick={handleCheckout}>
                 Proceed to Checkout
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

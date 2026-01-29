@@ -11,7 +11,17 @@ import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { ShoppingBag, CreditCard, Truck } from 'lucide-react';
-import type { Address } from '@/lib/api';
+
+interface ShippingAddress {
+  full_name: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  phone: string;
+}
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -20,13 +30,13 @@ export default function Checkout() {
   const { isAuthenticated, user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [shippingAddress, setShippingAddress] = useState<Address>({
-    fullName: user?.fullName || '',
-    addressLine1: '',
-    addressLine2: '',
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
+    full_name: user?.full_name || '',
+    address_line1: '',
+    address_line2: '',
     city: '',
     state: '',
-    postalCode: '',
+    postal_code: '',
     country: 'United States',
     phone: '',
   });
@@ -61,7 +71,7 @@ export default function Checkout() {
     );
   }
 
-  const handleInputChange = (field: keyof Address, value: string) => {
+  const handleInputChange = (field: keyof ShippingAddress, value: string) => {
     setShippingAddress(prev => ({ ...prev, [field]: value }));
   };
 
@@ -69,8 +79,8 @@ export default function Checkout() {
     e.preventDefault();
     
     // Validate required fields
-    if (!shippingAddress.fullName || !shippingAddress.addressLine1 || !shippingAddress.city || 
-        !shippingAddress.state || !shippingAddress.postalCode || !shippingAddress.country) {
+    if (!shippingAddress.full_name || !shippingAddress.address_line1 || !shippingAddress.city || 
+        !shippingAddress.state || !shippingAddress.postal_code || !shippingAddress.country) {
       toast({
         title: 'Missing information',
         description: 'Please fill in all required shipping fields.',
@@ -95,7 +105,7 @@ export default function Checkout() {
         description: `Your order #${orderNumber} has been confirmed.`,
       });
       
-      navigate('/account/orders');
+      navigate('/account');
     } catch (error) {
       toast({
         title: 'Order failed',
@@ -126,30 +136,30 @@ export default function Checkout() {
                 <CardContent className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
-                      <Label htmlFor="fullName">Full Name *</Label>
+                      <Label htmlFor="full_name">Full Name *</Label>
                       <Input
-                        id="fullName"
-                        value={shippingAddress.fullName}
-                        onChange={(e) => handleInputChange('fullName', e.target.value)}
+                        id="full_name"
+                        value={shippingAddress.full_name}
+                        onChange={(e) => handleInputChange('full_name', e.target.value)}
                         required
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label htmlFor="addressLine1">Address Line 1 *</Label>
+                      <Label htmlFor="address_line1">Address Line 1 *</Label>
                       <Input
-                        id="addressLine1"
-                        value={shippingAddress.addressLine1}
-                        onChange={(e) => handleInputChange('addressLine1', e.target.value)}
+                        id="address_line1"
+                        value={shippingAddress.address_line1}
+                        onChange={(e) => handleInputChange('address_line1', e.target.value)}
                         placeholder="Street address"
                         required
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label htmlFor="addressLine2">Address Line 2</Label>
+                      <Label htmlFor="address_line2">Address Line 2</Label>
                       <Input
-                        id="addressLine2"
-                        value={shippingAddress.addressLine2}
-                        onChange={(e) => handleInputChange('addressLine2', e.target.value)}
+                        id="address_line2"
+                        value={shippingAddress.address_line2}
+                        onChange={(e) => handleInputChange('address_line2', e.target.value)}
                         placeholder="Apartment, suite, etc. (optional)"
                       />
                     </div>
@@ -172,11 +182,11 @@ export default function Checkout() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="postalCode">Postal Code *</Label>
+                      <Label htmlFor="postal_code">Postal Code *</Label>
                       <Input
-                        id="postalCode"
-                        value={shippingAddress.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                        id="postal_code"
+                        value={shippingAddress.postal_code}
+                        onChange={(e) => handleInputChange('postal_code', e.target.value)}
                         required
                       />
                     </div>
@@ -249,9 +259,9 @@ export default function Checkout() {
                   {items.map((item) => (
                     <div key={item.product.id} className="flex gap-3">
                       <div className="w-16 h-16 bg-muted rounded overflow-hidden flex-shrink-0">
-                        {item.product.images?.[0] && (
+                        {item.product.image_url && (
                           <img
-                            src={item.product.images[0].image_url}
+                            src={item.product.image_url}
                             alt={item.product.name}
                             className="w-full h-full object-cover"
                           />

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import type { User } from '@/lib/api';
 
 const registerSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
@@ -54,11 +55,13 @@ const Register = () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       
       // Mock user data
-      const mockUser = {
+      const mockUser: User = {
         id: 'user-new',
         email: data.email,
-        fullName: data.fullName,
-        role: 'customer' as const,
+        full_name: data.fullName,
+        avatar_url: null,
+        role: 'customer',
+        created_at: new Date().toISOString(),
       };
       
       login(mockUser, 'mock-jwt-token');

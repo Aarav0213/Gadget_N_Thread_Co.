@@ -142,4 +142,112 @@ export default function Account() {
                 ) : (
                   <div className="space-y-4">
                     {orders.map((order) => (
-                      <
+                      <div
+                        key={order.id}
+                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+                          <div>
+                            <p className="font-medium">
+                              Order #{order.order_number || order.id.slice(0, 8)}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.created_at).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={statusColors[order.status] || 'bg-gray-100 text-gray-800'}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            </Badge>
+                            <span className="font-bold">${(order.grand_total || order.total).toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 text-sm">
+                          {order.items?.map((item) => (
+                            <p key={item.id} className="text-muted-foreground">
+                              {item.quantity}x {item.product_name}
+                            </p>
+                          ))}
+                        </div>
+
+                        {order.tracking_number && (
+                          <p className="mt-3 text-sm">
+                            <span className="text-muted-foreground">Tracking: </span>
+                            <span className="font-mono">{order.tracking_number}</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader>
+                <CardTitle>Messages</CardTitle>
+                <CardDescription>Your conversations with our support team</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">No messages yet</p>
+                  <Button onClick={() => navigate('/contact')}>Contact Support</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Settings</CardTitle>
+                <CardDescription>Update your account information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateProfile} className="space-y-4 max-w-md">
+                  <div>
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      value={profile.fullName}
+                      onChange={(e) => setProfile(prev => ({ ...prev, fullName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profile.email}
+                      onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={profile.phone}
+                      onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                  <Button type="submit" disabled={isUpdating}>
+                    {isUpdating ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
+  );
+}

@@ -15,7 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/authstore';
 import { toast } from 'sonner';
 import type { User } from '@/lib/api';
 
@@ -31,7 +31,7 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const redirectTo = searchParams.get('redirect') || '/';
 
@@ -45,11 +45,11 @@ const Login = () => {
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
-    
+
     try {
-      // Mock login - replace with actual API call
+      // Mock login - replace with actual Supabase login
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      
+
       // Mock user data
       const mockUser: User = {
         id: 'user-1',
@@ -59,8 +59,8 @@ const Login = () => {
         role: data.email.includes('admin') ? 'admin' : 'customer',
         created_at: new Date().toISOString(),
       };
-      
-      login(mockUser, 'mock-jwt-token');
+
+      setUser(mockUser);
       toast.success('Welcome back!');
       navigate(redirectTo);
     } catch (error) {
@@ -152,7 +152,10 @@ const Login = () => {
           <div className="mt-8 text-center">
             <p className="text-muted-foreground">
               Don't have an account?{' '}
-              <Link to="/register" className="text-primary hover:underline font-medium">
+              <Link
+                to="/register"
+                className="text-primary hover:underline font-medium"
+              >
                 Sign up
               </Link>
             </p>

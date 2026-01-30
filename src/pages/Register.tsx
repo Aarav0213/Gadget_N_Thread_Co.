@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -48,57 +50,42 @@ const Register = () => {
   });
 
   const onSubmit = async (data: RegisterForm) => {
-  setIsLoading(true);
+    setIsLoading(true);
 
-  try {
-    const redirectUrl = `${window.location.origin}/`;
+    try {
+      const redirectUrl = `${window.location.origin}/`;
 
-    const { data: signUpData, error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: data.fullName,
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: data.fullName,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      if (error.message.includes('already registered')) {
-        toast.error('This email is already registered. Please sign in instead.');
-      } else {
-        toast.error(error.message);
-      }
-      return;
-    }
-
-    // ✅ NEW: insert profile row
-    if (signUpData?.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: signUpData.user.id,
-          email: signUpData.user.email,
-          full_name: data.fullName,
-        });
-
-      if (profileError) {
-        console.error('Profile insert error:', profileError);
-        toast.error('Account created, but profile failed to save.');
+      if (error) {
+        if (error.message.toLowerCase().includes('already')) {
+          toast.error('This email is already registered. Please sign in instead.');
+        } else {
+          toast.error(error.message);
+        }
         return;
       }
+
+      // ✅ DO NOT insert into profiles here
+      // The database trigger you added handles that after email confirmation
+
+      toast.success('Account created! Please check your email to confirm.');
+      navigate('/login');
+    } catch {
+      toast.error('Failed to create account');
+    } finally {
+      setIsLoading(false);
     }
-
-    toast.success('Account created! Please check your email to confirm.');
-    navigate('/login');
-  } catch (error) {
-    toast.error('Failed to create account');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return (
     <Layout>
@@ -161,7 +148,11 @@ const Register = () => {
                           className="absolute right-0 top-0 h-full px-3"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </FormControl>

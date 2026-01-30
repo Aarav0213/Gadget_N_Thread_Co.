@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useCartStore } from '@/stores/cartStore';
-import { useAuthStore } from '@/stores/authstore';
+import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { ShoppingBag, CreditCard, Truck } from 'lucide-react';
 
@@ -31,7 +31,7 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    full_name: user?.full_name || '',
+    full_name: user?.user_metadata?.full_name || '',
     address_line1: '',
     address_line2: '',
     city: '',

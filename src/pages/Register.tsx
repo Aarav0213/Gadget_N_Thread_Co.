@@ -15,9 +15,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuthStore } from '@/stores/authstore';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import type { User } from '@/lib/api';
 
 const registerSchema = z
   .object({
@@ -37,7 +36,6 @@ const Register = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const setUser = useAuthStore((state) => state.setUser);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -53,22 +51,30 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      // Mock registration - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const redirectUrl = `${window.location.origin}/`;
 
-      // Mock user data
-      const mockUser: User = {
-        id: 'user-new',
+      const { error } = await supabase.auth.signUp({
         email: data.email,
-        full_name: data.fullName,
-        avatar_url: null,
-        role: 'customer',
-        created_at: new Date().toISOString(),
-      };
+        password: data.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: data.fullName,
+          },
+        },
+      });
 
-      setUser(mockUser); // <-- updated to use setUser
-      toast.success('Account created successfully!');
-      navigate('/');
+      if (error) {
+        if (error.message.includes('already registered')) {
+          toast.error('This email is already registered. Please sign in instead.');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      toast.success('Account created! Please check your email to confirm.');
+      navigate('/login');
     } catch (error) {
       toast.error('Failed to create account');
     } finally {

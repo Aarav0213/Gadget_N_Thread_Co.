@@ -48,39 +48,57 @@ const Register = () => {
   });
 
   const onSubmit = async (data: RegisterForm) => {
-    setIsLoading(true);
+  setIsLoading(true);
 
-    try {
-      const redirectUrl = `${window.location.origin}/`;
+  try {
+    const redirectUrl = `${window.location.origin}/`;
 
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: data.fullName,
-          },
+    const { data: signUpData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          full_name: data.fullName,
         },
-      });
+      },
+    });
 
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('This email is already registered. Please sign in instead.');
-        } else {
-          toast.error(error.message);
-        }
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast.error('This email is already registered. Please sign in instead.');
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+
+    // ✅ NEW: insert profile row
+    if (signUpData?.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: signUpData.user.id,
+          email: signUpData.user.email,
+          full_name: data.fullName,
+        });
+
+      if (profileError) {
+        console.error('Profile insert error:', profileError);
+        toast.error('Account created, but profile failed to save.');
         return;
       }
-
-      toast.success('Account created! Please check your email to confirm.');
-      navigate('/login');
-    } catch (error) {
-      toast.error('Failed to create account');
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    toast.success('Account created! Please check your email to confirm.');
+    navigate('/login');
+  } catch (error) {
+    toast.error('Failed to create account');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <Layout>

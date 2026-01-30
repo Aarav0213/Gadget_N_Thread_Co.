@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { useAuthStore } from '@/stores/authstore';
+import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { User, Package, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
@@ -31,7 +31,7 @@ export default function Account() {
   const [loadingOrders, setLoadingOrders] = useState(true);
 
   const [profile, setProfile] = useState({
-    fullName: user?.full_name || '',
+    fullName: user?.user_metadata?.full_name || '',
     email: user?.email || '',
     phone: '',
   });

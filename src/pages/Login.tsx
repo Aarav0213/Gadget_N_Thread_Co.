@@ -15,9 +15,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuthStore } from '@/stores/authstore';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import type { User } from '@/lib/api';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -31,7 +30,6 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const setUser = useAuthStore((state) => state.setUser);
 
   const redirectTo = searchParams.get('redirect') || '/';
 
@@ -47,24 +45,20 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Mock login - replace with actual Supabase login
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock user data
-      const mockUser: User = {
-        id: 'user-1',
+      const { error } = await supabase.auth.signInWithPassword({
         email: data.email,
-        full_name: 'John Doe',
-        avatar_url: null,
-        role: data.email.includes('admin') ? 'admin' : 'customer',
-        created_at: new Date().toISOString(),
-      };
+        password: data.password,
+      });
 
-      setUser(mockUser);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
       toast.success('Welcome back!');
       navigate(redirectTo);
     } catch (error) {
-      toast.error('Invalid email or password');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -158,17 +152,6 @@ const Login = () => {
               >
                 Sign up
               </Link>
-            </p>
-          </div>
-
-          {/* Demo Hint */}
-          <div className="mt-8 p-4 bg-secondary/50 rounded-lg text-sm">
-            <p className="font-medium mb-2">Demo Accounts:</p>
-            <p className="text-muted-foreground">
-              Use any email with "admin" to login as admin (e.g., admin@test.com)
-            </p>
-            <p className="text-muted-foreground">
-              Use any other email to login as customer
             </p>
           </div>
         </div>

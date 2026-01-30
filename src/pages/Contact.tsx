@@ -20,7 +20,7 @@ export default function Contact() {
   const productId = searchParams.get('product');
   
   const [form, setForm] = useState({
-    name: user?.full_name || '',
+    name: user?.user_metadata?.full_name || '',
     email: user?.email || '',
     subject: productId ? `Question about product #${productId}` : '',
     message: '',

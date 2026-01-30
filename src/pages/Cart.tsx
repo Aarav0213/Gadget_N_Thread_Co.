@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useCartStore } from '@/stores/cartStore';
-import { useAuthStore } from '@/stores/authstore';
+import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 
 const Cart = () => {

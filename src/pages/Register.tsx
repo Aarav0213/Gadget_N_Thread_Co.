@@ -49,46 +49,63 @@ const Register = () => {
     },
   });
 
-const onSubmit = async (data: RegisterForm) => {
-  setIsLoading(true);
-
-  try {
-    // 1️⃣ Sign up the user
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { full_name: data.fullName },
-      },
-    });
-
-    if (signUpError) throw signUpError;
-
-    // 2️⃣ Ensure we have the user ID
-    let userId = signUpData.user?.id;
-    if (!userId) {
-      const { data: userData, error: userFetchError } = await supabase.auth.getUserByEmail(data.email);
-      if (userFetchError || !userData.user?.id) throw new Error('Unable to get user ID after signup');
-      userId = userData.user.id;
+  const onSubmit = async (data: RegisterForm) => {
+    setIsLoading(true);
+  
+    try {
+      // 1️⃣ Sign up the user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { full_name: data.fullName },
+        },
+      });
+  
+      if (signUpError) throw signUpError;
+  
+      // 2️⃣ Ensure we have the user ID
+      let userId = signUpData.user?.id;
+      if (!userId) {
+        const { data: userData, error: userFetchError } = await supabase.auth.getUserByEmail(data.email);
+        if (userFetchError || !userData.user?.id) throw new Error('Unable to get user ID after signup');
+        userId = userData.user.id;
+      }
+  
+      // 3️⃣ Insert into profiles table
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: userId,
+        email: data.email,
+        full_name: data.fullName,
+        created_at: new Date().toISOString(),
+      });
+  
+      if (profileError) throw profileError;
+  
+      // 4️⃣ Insert into user_roles table
+      const { error: roleError } = await supabase.from('user_roles').insert({
+        user_id: userId,
+        role: 'customer',
+        created_at: new Date().toISOString(),
+      });
+  
+      if (roleError) {
+        console.error('Failed to insert into user_roles:', roleError);
+        toast.error('Account created, but failed to assign default role.');
+      } else {
+        toast.success('Account created! You can now log in.');
+      }
+  
+      navigate('/login');
+    } catch (err: any) {
+      console.error('Signup failed:', err);
+      toast.error(err.message || 'Failed to create account');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // 3️⃣ Insert into profiles table
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: userId,
-      email: data.email,
-      full_name: data.fullName,
-      created_at: new Date().toISOString(),
-    });
-
-    if (profileError) throw profileError;
-
-    // 4️⃣ Insert into user_roles table
-    const { error: roleError } = await supabase.from('user_roles').insert({
-      user_id: userId,
-      role: 'customer',
-      created_at: new Date().toISOString(),
-    });
 
     if (roleError) {
       console.error('Failed to insert into user_roles:', roleError);

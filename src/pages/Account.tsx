@@ -60,47 +60,45 @@ export default function Account() {
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsUpdating(true);
-  
-    try {
-      if (!user) throw new Error('User not logged in');
-  
-      // 1️⃣ Update Supabase Auth (email/phone)
-      const { error: authError } = await supabase.auth.updateUser({
-        email: profile.email,
-        phone: profile.phone,
-      });
-  
-      if (authError) throw authError;
-  
-      // 2️⃣ Update profiles table (full_name, phone)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: profile.fullName,
-          phone: profile.phone,
-        })
-        .eq('id', user.id);
-  
-      if (profileError) throw profileError;
-  
-      toast({
-        title: 'Profile updated',
-        description: 'Your profile has been updated successfully.',
-      });
-    } catch (err: any) {
-      console.error(err);
-      toast({
-        title: 'Update failed',
-        description: err.message || 'There was an error updating your profile.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdating(false);
+const handleUpdateProfile = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsUpdating(true);
+
+  try {
+    if (!user) throw new Error('User not logged in');
+
+    // ✅ Validate phone format (optional)
+    if (profile.phone && !/^\+?[0-9]{8,15}$/.test(profile.phone)) {
+      throw new Error('Please enter a valid phone number');
     }
-  };
+
+    // 1️⃣ Update only the profiles table (full name, phone, email)
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: profile.fullName,
+        phone: profile.phone,
+        email: profile.email, // optional if you want users to update email
+      })
+      .eq('id', user.id);
+
+    if (profileError) throw profileError;
+
+    toast({
+      title: 'Profile updated',
+      description: 'Your profile has been updated successfully.',
+    });
+  } catch (err: any) {
+    console.error(err);
+    toast({
+      title: 'Update failed',
+      description: err.message || 'There was an error updating your profile.',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsUpdating(false);
+  }
+};
 
   const handleLogout = async () => {
     try {

@@ -63,18 +63,26 @@ const Register = () => {
         },
       });
   
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message.toLowerCase().includes('already')) {
+          toast.error('This email is already registered. Please sign in instead.');
+        } else {
+          toast.error(signUpError.message);
+        }
+        return;
+      }
   
-      // 2️⃣ Ensure we have the user ID
       let userId = signUpData.user?.id;
+  
+      // 2️⃣ If no userId yet, fetch it from Supabase
       if (!userId) {
-        const { data: userData, error: userFetchError } = await supabase.auth.getUserByEmail(data.email);
-        if (userFetchError || !userData.user?.id) throw new Error('Unable to get user ID after signup');
+        const { data: userData, error: fetchError } = await supabase.auth.getUserByEmail(data.email);
+        if (fetchError || !userData.user?.id) throw new Error('Unable to get user ID after signup');
         userId = userData.user.id;
       }
   
-      // 3️⃣ Insert into profiles table
-      const { error: profileError } = await supabase.from('profiles').insert({
+      // 3️⃣ Insert profile
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: userId,
         email: data.email,
         full_name: data.fullName,
@@ -83,28 +91,36 @@ const Register = () => {
   
       if (profileError) throw profileError;
   
-      // 4️⃣ Insert into user_roles table
-      const { error: roleError } = await supabase.from('user_roles').insert({
-        user_id: userId,
-        role: 'customer',
-        created_at: new Date().toISOString(),
-      });
+      // 4️⃣ Insert default role if it doesn’t exist
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
   
-      if (roleError) {
-        console.error('Failed to insert into user_roles:', roleError);
-        toast.error('Account created, but failed to assign default role.');
-      } else {
-        toast.success('Account created! You can now log in.');
+      if (!existingRole) {
+        const { error: roleError } = await supabase.from('user_roles').insert({
+          user_id: userId,
+          role: 'customer',
+          created_at: new Date().toISOString(),
+        });
+  
+        if (roleError) {
+          console.error('Failed to insert into user_roles:', roleError);
+          toast.error('Account created, but failed to assign default role.');
+        }
       }
   
+      toast.success('Account created! You can now log in.');
       navigate('/login');
     } catch (err: any) {
-      console.error('Signup failed:', err);
+      console.error('Signup error:', err);
       toast.error(err.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
   };
+
 
 
     if (roleError) {

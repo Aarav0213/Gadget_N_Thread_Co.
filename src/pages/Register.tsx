@@ -51,21 +51,19 @@ const Register = () => {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
-
+  
     try {
-      const redirectUrl = `${window.location.origin}/`;
-
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             full_name: data.fullName,
           },
         },
       });
-
+  
       if (error) {
         if (error.message.toLowerCase().includes('already')) {
           toast.error('This email is already registered. Please sign in instead.');
@@ -74,18 +72,26 @@ const Register = () => {
         }
         return;
       }
-
-      // ✅ DO NOT insert into profiles here
-      // The database trigger you added handles that after email confirmation
-
-      toast.success('Account created! Please check your email to confirm.');
+  
+      // Insert profile immediately since email confirmation is OFF
+      if (signUpData.user) {
+        await supabase.from('profiles').insert({
+          id: signUpData.user.id,
+          email: signUpData.user.email,
+          full_name: data.fullName,
+        });
+      }
+  
+      toast.success('Account created! You can now log in.');
       navigate('/login');
-    } catch {
+    } catch (err) {
       toast.error('Failed to create account');
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   return (
     <Layout>

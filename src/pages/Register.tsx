@@ -53,8 +53,8 @@ const Register = () => {
     setIsLoading(true);
   
     try {
-      // Sign up the user
-      const { data: signUpData, error } = await supabase.auth.signUp({
+      // 1️⃣ Sign up the user
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -64,34 +64,42 @@ const Register = () => {
         },
       });
   
-      if (error) {
-        if (error.message.toLowerCase().includes('already')) {
+      if (signUpError) {
+        if (signUpError.message.toLowerCase().includes('already')) {
           toast.error('This email is already registered. Please sign in instead.');
         } else {
-          toast.error(error.message);
+          toast.error(signUpError.message);
         }
         return;
       }
   
-      // Insert profile immediately since email confirmation is OFF
-      if (signUpData.user) {
-        await supabase.from('profiles').insert({
-          id: signUpData.user.id,
-          email: signUpData.user.email,
-          full_name: data.fullName,
-        });
-      }
+      const userId = signUpData.user?.id;
+      if (!userId) throw new Error('Failed to get user ID from Supabase');
+  
+      // 2️⃣ Insert profile into profiles table
+      await supabase.from('profiles').insert({
+        id: userId,
+        email: data.email,
+        full_name: data.fullName,
+        created_at: new Date().toISOString(),
+      });
+  
+      // 3️⃣ Insert default role into user_roles table
+      await supabase.from('user_roles').insert({
+        user_id: userId,
+        role: 'customer',
+        created_at: new Date().toISOString(),
+      });
   
       toast.success('Account created! You can now log in.');
       navigate('/login');
-    } catch (err) {
-      toast.error('Failed to create account');
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || 'Failed to create account');
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <Layout>

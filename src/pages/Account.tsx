@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { User, Package, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import type { Order } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -66,7 +67,7 @@ export default function Account() {
     try {
       if (!user) throw new Error('User not logged in');
   
-      // 1️⃣ Update Supabase Auth (phone/email)
+      // 1️⃣ Update Supabase Auth (email/phone)
       const { error: authError } = await supabase.auth.updateUser({
         email: profile.email,
         phone: profile.phone,
@@ -74,7 +75,7 @@ export default function Account() {
   
       if (authError) throw authError;
   
-      // 2️⃣ Update profiles table (full name, phone)
+      // 2️⃣ Update profiles table (full_name, phone)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -100,7 +101,6 @@ export default function Account() {
       setIsUpdating(false);
     }
   };
-
 
   const handleLogout = async () => {
     try {

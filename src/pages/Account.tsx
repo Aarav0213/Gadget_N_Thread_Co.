@@ -62,22 +62,45 @@ export default function Account() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdating(true);
+  
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!user) throw new Error('User not logged in');
+  
+      // 1️⃣ Update Supabase Auth (phone/email)
+      const { error: authError } = await supabase.auth.updateUser({
+        email: profile.email,
+        phone: profile.phone,
+      });
+  
+      if (authError) throw authError;
+  
+      // 2️⃣ Update profiles table (full name, phone)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.fullName,
+          phone: profile.phone,
+        })
+        .eq('id', user.id);
+  
+      if (profileError) throw profileError;
+  
       toast({
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',
       });
-    } catch {
+    } catch (err: any) {
+      console.error(err);
       toast({
         title: 'Update failed',
-        description: 'There was an error updating your profile.',
+        description: err.message || 'There was an error updating your profile.',
         variant: 'destructive',
       });
     } finally {
       setIsUpdating(false);
     }
   };
+
 
   const handleLogout = async () => {
     try {

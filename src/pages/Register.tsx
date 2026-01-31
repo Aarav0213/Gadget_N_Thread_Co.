@@ -51,23 +51,20 @@ const Register = () => {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
-  
     try {
-      // 1️⃣ Sign up user
+      // 1️⃣ Sign up the user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           emailRedirectTo: window.location.origin,
-          data: {
-            full_name: data.fullName,
-          },
+          data: { full_name: data.fullName },
         },
       });
-  
+
       if (signUpError) throw signUpError;
-  
-      // If no user ID yet, fetch it from Auth
+
+      // 2️⃣ Ensure we have the user ID
       let userId = signUpData.user?.id;
       if (!userId) {
         const {
@@ -77,22 +74,22 @@ const Register = () => {
         if (userFetchError || !user?.id) throw new Error('Unable to get user ID after signup');
         userId = user.id;
       }
-  
-      // 2️⃣ Insert profile
+
+      // 3️⃣ Insert into profiles table
       await supabase.from('profiles').insert({
         id: userId,
         email: data.email,
         full_name: data.fullName,
         created_at: new Date().toISOString(),
       });
-  
-      // 3️⃣ Insert default role
+
+      // 4️⃣ Insert default role
       await supabase.from('user_roles').insert({
         user_id: userId,
         role: 'customer',
         created_at: new Date().toISOString(),
       });
-  
+
       toast.success('Account created! You can now log in.');
       navigate('/login');
     } catch (err: any) {
@@ -164,11 +161,7 @@ const Register = () => {
                           className="absolute right-0 top-0 h-full px-3"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </FormControl>

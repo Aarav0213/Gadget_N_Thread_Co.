@@ -53,30 +53,32 @@ const Register = () => {
     setIsLoading(true);
   
     try {
-      // 1️⃣ Sign up the user
+      // 1️⃣ Sign up user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
+          emailRedirectTo: window.location.origin,
           data: {
             full_name: data.fullName,
           },
         },
       });
   
-      if (signUpError) {
-        if (signUpError.message.toLowerCase().includes('already')) {
-          toast.error('This email is already registered. Please sign in instead.');
-        } else {
-          toast.error(signUpError.message);
-        }
-        return;
+      if (signUpError) throw signUpError;
+  
+      // If no user ID yet, fetch it from Auth
+      let userId = signUpData.user?.id;
+      if (!userId) {
+        const {
+          data: { user },
+          error: userFetchError,
+        } = await supabase.auth.getUserByEmail(data.email);
+        if (userFetchError || !user?.id) throw new Error('Unable to get user ID after signup');
+        userId = user.id;
       }
   
-      const userId = signUpData.user?.id;
-      if (!userId) throw new Error('Failed to get user ID from Supabase');
-  
-      // 2️⃣ Insert profile into profiles table
+      // 2️⃣ Insert profile
       await supabase.from('profiles').insert({
         id: userId,
         email: data.email,
@@ -84,7 +86,7 @@ const Register = () => {
         created_at: new Date().toISOString(),
       });
   
-      // 3️⃣ Insert default role into user_roles table
+      // 3️⃣ Insert default role
       await supabase.from('user_roles').insert({
         user_id: userId,
         role: 'customer',

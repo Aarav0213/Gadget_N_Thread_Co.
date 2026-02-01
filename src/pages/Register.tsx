@@ -4,7 +4,6 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -51,7 +49,7 @@ const Register = () => {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
-
+    
     try {
       // 1️⃣ Sign up the user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -72,47 +70,56 @@ const Register = () => {
         return;
       }
 
-      // 2️⃣ Get user ID
-      let userId = signUpData.user?.id;
+      // 2️⃣ Verify we got a user ID
+      const userId = signUpData.user?.id;
+      
       if (!userId) {
-        const { data: userData, error: fetchError } = await supabase.auth.getUserByEmail(data.email);
-        if (fetchError || !userData.user?.id) throw new Error('Unable to get user ID after signup');
-        userId = userData.user.id;
+        throw new Error('User ID not returned after signup');
       }
 
-      // 3️⃣ Insert or upsert profile
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: userId,
-        email: data.email,
-        full_name: data.fullName,
-        created_at: new Date().toISOString(),
-      });
-      if (profileError) throw profileError;
+      // 3️⃣ Upsert profile (handles both insert and update)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            email: data.email,
+            full_name: data.fullName,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
 
-      // 4️⃣ Insert default role if not exists
-      const { data: existingRole } = await supabase
+      if (profileError) {
+        console.error('Profile upsert error:', profileError);
+        throw new Error('Failed to create user profile');
+      }
+
+      // 4️⃣ Upsert user role (no need to check if exists first!)
+      const { error: roleError } = await supabase
         .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+        .upsert(
+          {
+            user_id: userId,
+            role: 'customer',
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' }
+        );
 
-      if (!existingRole) {
-        const { error: roleError } = await supabase.from('user_roles').insert({
-          user_id: userId,
-          role: 'customer',
-          created_at: new Date().toISOString(),
-        });
-        if (roleError) {
-          console.error('Failed to insert into user_roles:', roleError);
-          toast.error('Account created, but failed to assign default role.');
-        }
+      if (roleError) {
+        console.error('User role upsert error:', roleError);
+        // Don't throw here - account is created, just log the issue
+        toast.warning('Account created, but there was an issue assigning the role. Please contact support if you experience any issues.');
+      } else {
+        toast.success('Account created successfully! You can now log in.');
       }
 
-      toast.success('Account created! You can now log in.');
       navigate('/login');
+      
     } catch (err: any) {
       console.error('Signup failed:', err);
-      toast.error(err.message || 'Failed to create account');
+      toast.error(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +186,11 @@ const Register = () => {
                           className="absolute right-0 top-0 h-full px-3"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </FormControl>

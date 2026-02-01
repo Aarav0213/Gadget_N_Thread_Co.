@@ -51,13 +51,15 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // 1️⃣ Sign up the user
+      // Sign up the user - trigger handles profile and role creation automatically
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           emailRedirectTo: window.location.origin,
-          data: { full_name: data.fullName },
+          data: { 
+            full_name: data.fullName 
+          },
         },
       });
 
@@ -70,49 +72,11 @@ const Register = () => {
         return;
       }
 
-      // 2️⃣ Verify we got a user ID
-      const userId = signUpData.user?.id;
-      
-      if (!userId) {
-        throw new Error('User ID not returned after signup');
+      if (!signUpData.user) {
+        throw new Error('No user data returned after signup');
       }
 
-      // 3️⃣ Upsert profile (handles both insert and update)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: userId,
-            email: data.email,
-            full_name: data.fullName,
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
-
-      if (profileError) {
-        console.error('Profile upsert error:', profileError);
-        throw new Error('Failed to create user profile');
-      }
-
-      // 4️⃣ Upsert user role using the RLS policy
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert(
-          {
-            user_id: userId,
-            role: 'customer',
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id' }
-        );
-
-      if (roleError) {
-        console.error('User role upsert error:', roleError);
-        toast.error('Account created, but failed to assign role. Please contact support.');
-        return;
-      }
-
+      // Success! The database trigger has already created the profile and assigned the role
       toast.success('Account created successfully! You can now log in.');
       navigate('/login');
       

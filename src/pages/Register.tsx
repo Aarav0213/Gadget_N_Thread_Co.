@@ -95,7 +95,7 @@ const Register = () => {
         throw new Error('Failed to create user profile');
       }
 
-      // 4️⃣ Upsert user role (no need to check if exists first!)
+      // 4️⃣ Upsert user role using the RLS policy
       const { error: roleError } = await supabase
         .from('user_roles')
         .upsert(
@@ -109,12 +109,11 @@ const Register = () => {
 
       if (roleError) {
         console.error('User role upsert error:', roleError);
-        // Don't throw here - account is created, just log the issue
-        toast.warning('Account created, but there was an issue assigning the role. Please contact support if you experience any issues.');
-      } else {
-        toast.success('Account created successfully! You can now log in.');
+        toast.error('Account created, but failed to assign role. Please contact support.');
+        return;
       }
 
+      toast.success('Account created successfully! You can now log in.');
       navigate('/login');
       
     } catch (err: any) {

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { Search, Eye, Package, Truck } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import type { Order } from '@/lib/api';
@@ -58,6 +59,35 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingForm, setTrackingForm] = useState({ number: '', url: '' });
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== ORDERS AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   useEffect(() => {
     loadOrders();
   }, []);
@@ -65,16 +95,23 @@ export default function AdminOrders() {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      console.log('Loading orders...');
       const data = await ordersApi.getAll();
+      console.log('Loaded orders:', data?.length || 0);
       setOrders(data || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load orders.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = orders.filter((order) => {
     const matchesSearch = (order.order_number || order.id).toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -82,6 +119,7 @@ export default function AdminOrders() {
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
+      console.log('Updating order status:', orderId, 'to', newStatus);
       await ordersApi.update(orderId, { status: newStatus });
       toast({
         title: 'Order updated',
@@ -102,7 +140,8 @@ export default function AdminOrders() {
     if (!trackingForm.number || !selectedOrder) return;
     
     try {
-      await ordersApi.update(selectedOrder.id, { 
+      console.log('Adding tracking number:', trackingForm.number, 'to order:', selectedOrder.id);
+      await ordersApi.update(selectedOrder.id, {
         tracking_number: trackingForm.number,
       });
       toast({
@@ -148,7 +187,7 @@ export default function AdminOrders() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  {statusOptions.map(option => (
+                  {statusOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -197,7 +236,7 @@ export default function AdminOrders() {
                             </Badge>
                           </SelectTrigger>
                           <SelectContent>
-                            {statusOptions.map(option => (
+                            {statusOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
                                 {option.label}
                               </SelectItem>
@@ -232,7 +271,6 @@ export default function AdminOrders() {
           <DialogHeader>
             <DialogTitle>Order {selectedOrder?.order_number || selectedOrder?.id.slice(0, 8)}</DialogTitle>
           </DialogHeader>
-
           {selectedOrder && (
             <div className="space-y-6">
               {/* Order Items */}
@@ -297,7 +335,7 @@ export default function AdminOrders() {
                       <Input
                         id="trackingNumber"
                         value={trackingForm.number}
-                        onChange={(e) => setTrackingForm(prev => ({ ...prev, number: e.target.value }))}
+                        onChange={(e) => setTrackingForm((prev) => ({ ...prev, number: e.target.value }))}
                         placeholder="Enter tracking number"
                       />
                     </div>

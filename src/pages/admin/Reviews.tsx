@@ -21,7 +21,7 @@ import {
 import { StarRating } from '@/components/products/StarRating';
 import { useToast } from '@/hooks/use-toast';
 import { Search, MoreHorizontal, Star, Trash2, EyeOff, CheckCircle } from 'lucide-react';
-import { supabase } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import type { Review } from '@/lib/api';
 
 interface ReviewWithMeta extends Review {
@@ -35,6 +35,35 @@ export default function AdminReviews() {
   const [reviews, setReviews] = useState<ReviewWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== REVIEWS AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   useEffect(() => {
     loadReviews();
   }, []);
@@ -42,41 +71,59 @@ export default function AdminReviews() {
   const loadReviews = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase
+      console.log('Loading reviews...');
+      
+      const { data, error } = await supabase
         .from('reviews')
         .select('*, product:products(name)')
         .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading reviews:', error);
+        throw error;
+      }
       
       const mapped: ReviewWithMeta[] = (data || []).map((r: any) => ({
         ...r,
         productName: r.product?.name || 'Unknown Product',
         is_featured: r.is_featured || false,
       }));
+      
+      console.log('Loaded reviews:', mapped.length);
       setReviews(mapped);
     } catch (error) {
       console.error('Failed to load reviews:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load reviews.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredReviews = reviews.filter(review =>
+  const filteredReviews = reviews.filter((review) =>
     review.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (review.user_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     review.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleFeature = async (reviewId: string) => {
-    const review = reviews.find(r => r.id === reviewId);
+    const review = reviews.find((r) => r.id === reviewId);
     if (!review) return;
-
+    
     try {
-      await supabase
+      console.log('Toggling featured status for review:', reviewId);
+      
+      const { error } = await supabase
         .from('reviews')
         .update({ is_featured: !review.is_featured })
         .eq('id', reviewId);
       
-      setReviews(prev => prev.map(r =>
+      if (error) throw error;
+      
+      setReviews((prev) => prev.map((r) =>
         r.id === reviewId ? { ...r, is_featured: !r.is_featured } : r
       ));
       
@@ -86,13 +133,28 @@ export default function AdminReviews() {
       });
     } catch (error) {
       console.error('Failed to update review:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update review.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleDelete = async (reviewId: string) => {
+    if (!confirm('Are you sure you want to delete this review?')) return;
+    
     try {
-      await supabase.from('reviews').delete().eq('id', reviewId);
-      setReviews(prev => prev.filter(r => r.id !== reviewId));
+      console.log('Deleting review:', reviewId);
+      
+      const { error } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('id', reviewId);
+      
+      if (error) throw error;
+      
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
       
       toast({
         title: 'Review deleted',
@@ -100,23 +162,38 @@ export default function AdminReviews() {
       });
     } catch (error) {
       console.error('Failed to delete review:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete review.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleHide = async (reviewId: string) => {
     try {
-      await supabase
+      console.log('Hiding review:', reviewId);
+      
+      const { error } = await supabase
         .from('reviews')
         .update({ is_active: false })
         .eq('id', reviewId);
+      
+      if (error) throw error;
       
       toast({
         title: 'Review hidden',
         description: 'The review is now hidden from public view.',
       });
+      
       loadReviews();
     } catch (error) {
       console.error('Failed to hide review:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to hide review.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -147,7 +224,7 @@ export default function AdminReviews() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">
-                {reviews.filter(r => r.is_featured).length}
+                {reviews.filter((r) => r.is_featured).length}
               </div>
               <p className="text-sm text-muted-foreground">Featured</p>
             </CardContent>
@@ -155,7 +232,7 @@ export default function AdminReviews() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">
-                {reviews.filter(r => r.is_verified_purchase).length}
+                {reviews.filter((r) => r.is_verified_purchase).length}
               </div>
               <p className="text-sm text-muted-foreground">Verified Purchases</p>
             </CardContent>
@@ -177,6 +254,8 @@ export default function AdminReviews() {
           <CardContent>
             {loading ? (
               <p className="text-muted-foreground">Loading reviews...</p>
+            ) : filteredReviews.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No reviews found</p>
             ) : (
               <Table>
                 <TableHeader>

@@ -33,29 +33,48 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // 🔍 DEBUG: Check authentication and role
+  // 🔍 COMPREHENSIVE DEBUG CHECK
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.log('🔍 Current user ID:', user?.id)
-      console.log('🔍 Current user email:', user?.email)
+      console.log('=== STARTING AUTH DEBUG ===')
       
-      if (user?.id) {
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single()
-        
-        console.log('🔍 Current role:', roleData?.role)
-        console.log('🔍 Role query error:', roleError)
-        
-        // Test the is_admin function
-        const { data: isAdminData, error: isAdminError } = await supabase.rpc('is_admin')
-        console.log('🔍 is_admin() returns:', isAdminData)
-        console.log('🔍 is_admin() error:', isAdminError)
+      // Step 1: Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      console.log('Step 1 - User ID:', user?.id)
+      console.log('Step 1 - User Email:', user?.email)
+      console.log('Step 1 - User Error:', userError)
+      
+      if (!user) {
+        console.error('❌ NO USER LOGGED IN!')
+        return
       }
+      
+      // Step 2: Query user_roles table directly
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user.id)
+      
+      console.log('Step 2 - Role Data:', roleData)
+      console.log('Step 2 - Role Error:', roleError)
+      
+      // Step 3: Test is_admin function
+      const { data: isAdminData, error: isAdminError } = await supabase.rpc('is_admin')
+      console.log('Step 3 - is_admin() Result:', isAdminData)
+      console.log('Step 3 - is_admin() Error:', isAdminError)
+      
+      // Step 4: Try to query products to test RLS
+      const { data: productsTest, error: productsError } = await supabase
+        .from('products')
+        .select('id, name')
+        .limit(1)
+      
+      console.log('Step 4 - Can query products:', productsTest)
+      console.log('Step 4 - Products Error:', productsError)
+      
+      console.log('=== END AUTH DEBUG ===')
     }
+    
     checkAuth()
   }, [])
 
@@ -67,6 +86,7 @@ export default function AdminProducts() {
     try {
       setLoading(true)
       const res = await productsApi.list()
+      console.log('Loaded products:', res?.length || 0)
       setProducts(res || [])
     } catch (err) {
       console.error('Failed to load products', err)
@@ -80,11 +100,13 @@ export default function AdminProducts() {
   )
 
   const handleAdd = () => {
+    console.log('Opening product form for new product')
     setEditingProduct(null)
     setIsFormOpen(true)
   }
 
   const handleEdit = (product: Product) => {
+    console.log('Opening product form to edit:', product.name)
     setEditingProduct(product)
     setIsFormOpen(true)
   }
@@ -93,6 +115,7 @@ export default function AdminProducts() {
     if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return
     
     try {
+      console.log('Attempting to delete product:', product.id)
       await productsApi.remove(product.id)
       toast({
         title: 'Product deleted',
@@ -126,6 +149,13 @@ export default function AdminProducts() {
           </Button>
         </div>
 
+        {/* Debug Info */}
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded text-sm">
+          <p className="font-semibold mb-2">🔍 Debug Info (Check Console F12 for details):</p>
+          <p>Products loaded: {products.length}</p>
+          <p>Open your browser console to see authentication details</p>
+        </div>
+
         {/* Table */}
         <Card>
           <CardHeader>
@@ -139,9 +169,12 @@ export default function AdminProducts() {
               />
             </div>
           </CardHeader>
+
           <CardContent>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading products…</p>
+            ) : filteredProducts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No products found</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -154,6 +187,7 @@ export default function AdminProducts() {
                     <TableHead className="w-[70px]" />
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id}>
@@ -177,10 +211,12 @@ export default function AdminProducts() {
                           </div>
                         </div>
                       </TableCell>
+
                       {/* Category */}
                       <TableCell>
                         {product.category?.name || 'Uncategorized'}
                       </TableCell>
+
                       {/* Price */}
                       <TableCell>
                         <div>
@@ -194,6 +230,7 @@ export default function AdminProducts() {
                           )}
                         </div>
                       </TableCell>
+
                       {/* Shipping */}
                       <TableCell>
                         {product.is_free_shipping ? (
@@ -202,6 +239,7 @@ export default function AdminProducts() {
                           <span>${(product.shipping_cost ?? 0).toFixed(2)}</span>
                         )}
                       </TableCell>
+
                       {/* Status */}
                       <TableCell>
                         <Badge
@@ -210,6 +248,7 @@ export default function AdminProducts() {
                           {product.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
+
                       {/* Actions */}
                       <TableCell>
                         <DropdownMenu>
@@ -218,9 +257,10 @@ export default function AdminProducts() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
+
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <a
+                              
                                 href={`/products/${product.slug}`}
                                 target="_blank"
                                 rel="noreferrer"
@@ -229,13 +269,15 @@ export default function AdminProducts() {
                                 View
                               </a>
                             </DropdownMenuItem>
+
                             <DropdownMenuItem
                               onClick={() => handleEdit(product)}
                             >
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem
+
+                            <DropdownMenuItem 
                               className="text-destructive"
                               onClick={() => handleDelete(product)}
                             >

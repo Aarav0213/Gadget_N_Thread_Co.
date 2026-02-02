@@ -48,7 +48,7 @@ export default function AdminProducts() {
         console.error('❌ NO USER LOGGED IN!')
         return
       }
-      
+
       // Step 2: Query user_roles table directly
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
@@ -57,12 +57,12 @@ export default function AdminProducts() {
       
       console.log('Step 2 - Role Data:', roleData)
       console.log('Step 2 - Role Error:', roleError)
-      
+
       // Step 3: Test is_admin function
       const { data: isAdminData, error: isAdminError } = await supabase.rpc('is_admin')
       console.log('Step 3 - is_admin() Result:', isAdminData)
       console.log('Step 3 - is_admin() Error:', isAdminError)
-      
+
       // Step 4: Try to query products to test RLS
       const { data: productsTest, error: productsError } = await supabase
         .from('products')
@@ -169,7 +169,6 @@ export default function AdminProducts() {
               />
             </div>
           </CardHeader>
-
           <CardContent>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading products…</p>
@@ -187,7 +186,6 @@ export default function AdminProducts() {
                     <TableHead className="w-[70px]" />
                   </TableRow>
                 </TableHeader>
-
                 <TableBody>
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id}>
@@ -257,10 +255,9 @@ export default function AdminProducts() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              
+                              <a
                                 href={`/products/${product.slug}`}
                                 target="_blank"
                                 rel="noreferrer"
@@ -269,15 +266,11 @@ export default function AdminProducts() {
                                 View
                               </a>
                             </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                              onClick={() => handleEdit(product)}
-                            >
+                            <DropdownMenuItem onClick={() => handleEdit(product)}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDelete(product)}
                             >

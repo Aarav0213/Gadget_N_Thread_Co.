@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch';
 import { categoriesApi } from '@/lib/api';
 import type { Category } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
 
 export default function AdminCategories() {
@@ -40,6 +41,34 @@ export default function AdminCategories() {
     is_active: true,
   });
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== CATEGORIES AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   useEffect(() => {
     loadCategories();
   }, []);
@@ -48,21 +77,29 @@ export default function AdminCategories() {
     try {
       setLoading(true);
       const data = await categoriesApi.list();
+      console.log('Loaded categories:', data?.length || 0);
       setCategories(data || []);
     } catch (error) {
       console.error('Failed to load categories:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load categories.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleAdd = () => {
+    console.log('Opening form to add new category');
     setEditingCategory(null);
     setForm({ name: '', slug: '', description: '', is_active: true });
     setIsFormOpen(true);
   };
 
   const handleEdit = (category: Category) => {
+    console.log('Opening form to edit category:', category.name);
     setEditingCategory(category);
     setForm({
       name: category.name,
@@ -77,6 +114,7 @@ export default function AdminCategories() {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
     try {
+      console.log('Deleting category:', id);
       await categoriesApi.delete(id);
       toast({
         title: 'Category deleted',
@@ -98,6 +136,8 @@ export default function AdminCategories() {
     setIsSubmitting(true);
     
     try {
+      console.log('Submitting category form:', form);
+      
       if (editingCategory) {
         await categoriesApi.update(editingCategory.id, form);
       } else {
@@ -148,6 +188,8 @@ export default function AdminCategories() {
           <CardContent>
             {loading ? (
               <p className="text-muted-foreground">Loading categories...</p>
+            ) : categories.length === 0 ? (
+              <p className="text-muted-foreground">No categories found. Create your first category!</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -205,9 +247,9 @@ export default function AdminCategories() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="text-destructive"
                             onClick={() => handleDelete(category.id)}
                           >
@@ -231,14 +273,13 @@ export default function AdminCategories() {
               {editingCategory ? 'Edit Category' : 'Add New Category'}
             </DialogTitle>
           </DialogHeader>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">Category Name *</Label>
               <Input
                 id="name"
                 value={form.name}
-                onChange={(e) => setForm(prev => ({
+                onChange={(e) => setForm((prev) => ({
                   ...prev,
                   name: e.target.value,
                   slug: generateSlug(e.target.value),
@@ -252,7 +293,7 @@ export default function AdminCategories() {
               <Input
                 id="slug"
                 value={form.slug}
-                onChange={(e) => setForm(prev => ({ ...prev, slug: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
                 required
               />
             </div>
@@ -262,7 +303,7 @@ export default function AdminCategories() {
               <Textarea
                 id="description"
                 value={form.description}
-                onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
               />
             </div>
@@ -275,7 +316,7 @@ export default function AdminCategories() {
               <Switch
                 id="is_active"
                 checked={form.is_active}
-                onCheckedChange={(checked) => setForm(prev => ({ ...prev, is_active: checked }))}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
               />
             </div>
 

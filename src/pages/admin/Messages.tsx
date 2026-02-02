@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { Search, Send, User, CheckCircle, Clock } from 'lucide-react';
 import { messagesApi } from '@/lib/api';
 import type { Conversation, Message } from '@/lib/api';
@@ -26,6 +27,35 @@ export default function AdminMessages() {
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== MESSAGES AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   useEffect(() => {
     loadConversations();
   }, []);
@@ -39,7 +69,9 @@ export default function AdminMessages() {
   const loadConversations = async () => {
     try {
       setLoading(true);
+      console.log('Loading conversations...');
       const data = await messagesApi.getConversations();
+      
       // Map to include display fields
       const mapped: ConversationWithMeta[] = (data || []).map((conv: Conversation) => ({
         ...conv,
@@ -47,9 +79,16 @@ export default function AdminMessages() {
         lastMessage: conv.last_message || conv.subject || 'No message',
         unread: conv.unread_count || 0,
       }));
+      
+      console.log('Loaded conversations:', mapped.length);
       setConversations(mapped);
     } catch (error) {
       console.error('Failed to load conversations:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load conversations.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -57,30 +96,38 @@ export default function AdminMessages() {
 
   const loadMessages = async (conversationId: string) => {
     try {
+      console.log('Loading messages for conversation:', conversationId);
       const conv = await messagesApi.getConversation(conversationId);
       setMessages(conv.messages || []);
+      console.log('Loaded messages:', conv.messages?.length || 0);
     } catch (error) {
       console.error('Failed to load messages:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load messages.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const filteredConversations = conversations.filter(conv =>
+  const filteredConversations = conversations.filter((conv) =>
     conv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.subject.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSendReply = async () => {
     if (!replyText.trim() || !selectedConversation) return;
-
+    
     try {
+      console.log('Sending message to conversation:', selectedConversation.id);
       await messagesApi.sendMessage({
         conversation_id: selectedConversation.id,
         sender_id: 'admin',
         content: replyText,
       });
+      
       setReplyText('');
       loadMessages(selectedConversation.id);
-      
       toast({
         title: 'Message sent',
         description: 'Your reply has been sent to the customer.',
@@ -99,6 +146,7 @@ export default function AdminMessages() {
     if (!selectedConversation) return;
     
     try {
+      console.log('Resolving conversation:', selectedConversation.id);
       await messagesApi.updateConversationStatus(selectedConversation.id, 'resolved');
       toast({
         title: 'Conversation resolved',
@@ -107,6 +155,11 @@ export default function AdminMessages() {
       loadConversations();
     } catch (error) {
       console.error('Failed to resolve conversation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to resolve conversation.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -231,7 +284,6 @@ export default function AdminMessages() {
                       ))}
                     </div>
                   </ScrollArea>
-                  
                   {selectedConversation.status === 'open' && (
                     <div className="p-4 border-t">
                       <div className="flex gap-2">

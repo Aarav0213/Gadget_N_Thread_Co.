@@ -23,6 +23,7 @@ import { ProductFormDialog } from '@/components/admin/ProductFormDialog'
 import { productsApi } from '@/lib/api'
 import type { Product } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase'
 
 export default function AdminProducts() {
   const { toast } = useToast()
@@ -31,6 +32,32 @@ export default function AdminProducts() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      console.log('🔍 Current user ID:', user?.id)
+      console.log('🔍 Current user email:', user?.email)
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single()
+        
+        console.log('🔍 Current role:', roleData?.role)
+        console.log('🔍 Role query error:', roleError)
+        
+        // Test the is_admin function
+        const { data: isAdminData, error: isAdminError } = await supabase.rpc('is_admin')
+        console.log('🔍 is_admin() returns:', isAdminData)
+        console.log('🔍 is_admin() error:', isAdminError)
+      }
+    }
+    checkAuth()
+  }, [])
 
   useEffect(() => {
     loadProducts()
@@ -112,7 +139,6 @@ export default function AdminProducts() {
               />
             </div>
           </CardHeader>
-
           <CardContent>
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading products…</p>
@@ -128,7 +154,6 @@ export default function AdminProducts() {
                     <TableHead className="w-[70px]" />
                   </TableRow>
                 </TableHeader>
-
                 <TableBody>
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id}>
@@ -152,12 +177,10 @@ export default function AdminProducts() {
                           </div>
                         </div>
                       </TableCell>
-
                       {/* Category */}
                       <TableCell>
                         {product.category?.name || 'Uncategorized'}
                       </TableCell>
-
                       {/* Price */}
                       <TableCell>
                         <div>
@@ -171,7 +194,6 @@ export default function AdminProducts() {
                           )}
                         </div>
                       </TableCell>
-
                       {/* Shipping */}
                       <TableCell>
                         {product.is_free_shipping ? (
@@ -180,7 +202,6 @@ export default function AdminProducts() {
                           <span>${(product.shipping_cost ?? 0).toFixed(2)}</span>
                         )}
                       </TableCell>
-
                       {/* Status */}
                       <TableCell>
                         <Badge
@@ -189,7 +210,6 @@ export default function AdminProducts() {
                           {product.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
-
                       {/* Actions */}
                       <TableCell>
                         <DropdownMenu>
@@ -198,7 +218,6 @@ export default function AdminProducts() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
                               <a
@@ -210,15 +229,13 @@ export default function AdminProducts() {
                                 View
                               </a>
                             </DropdownMenuItem>
-
                             <DropdownMenuItem
                               onClick={() => handleEdit(product)}
                             >
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDelete(product)}
                             >

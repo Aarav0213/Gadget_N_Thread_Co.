@@ -51,7 +51,7 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      // Sign up the user - trigger handles profile and role creation automatically
+      // Step 1: Sign up the user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -76,8 +76,41 @@ const Register = () => {
         throw new Error('No user data returned after signup');
       }
 
-      // Success! The database trigger has already created the profile and assigned the role
-      toast.success('Account created successfully! You can now log in.');
+      const userId = signUpData.user.id;
+
+      // Step 2: Create profile entry (if you have a profiles table)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          full_name: data.fullName,
+          email: data.email,
+        });
+
+      if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+        console.error('Profile creation error:', profileError);
+        // Don't fail the whole registration if profile fails
+      }
+
+      // Step 3: Insert into user_roles table with default 'customer' role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: 'customer', // or whatever your default role should be
+        });
+
+      if (roleError) {
+        console.error('Role assignment error:', roleError);
+        
+        // If role assignment fails, try to clean up by deleting the user
+        // Note: This might not work if email confirmation is required
+        toast.error('Failed to assign user role. Please contact support.');
+        return;
+      }
+
+      // Step 4: Success!
+      toast.success('Account created successfully! Please check your email to confirm your account.');
       navigate('/login');
       
     } catch (err: any) {

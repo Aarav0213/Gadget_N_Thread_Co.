@@ -1,16 +1,18 @@
+import { useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  DollarSign, 
-  ShoppingCart, 
-  Package, 
-  Users, 
+import {
+  DollarSign,
+  ShoppingCart,
+  Package,
+  Users,
   TrendingUp,
   MessageSquare,
   Star,
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // Mock stats data
 const stats = [
@@ -59,6 +61,35 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== DASHBOARD AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   return (
     <AdminLayout>
       <div className="space-y-8">

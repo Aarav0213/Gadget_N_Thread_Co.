@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { Plus, Pencil, Trash2, Copy, Ticket } from 'lucide-react';
 
 interface DiscountCode {
@@ -81,7 +82,6 @@ export default function AdminDiscounts() {
   const [discounts, setDiscounts] = useState(mockDiscounts);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<DiscountCode | null>(null);
-  
   const [form, setForm] = useState({
     code: '',
     description: '',
@@ -92,7 +92,37 @@ export default function AdminDiscounts() {
     expiresAt: '',
   });
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== DISCOUNTS AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   const handleAdd = () => {
+    console.log('Opening form to create new discount');
     setEditingDiscount(null);
     setForm({
       code: '',
@@ -107,6 +137,7 @@ export default function AdminDiscounts() {
   };
 
   const handleEdit = (discount: DiscountCode) => {
+    console.log('Opening form to edit discount:', discount.code);
     setEditingDiscount(discount);
     setForm({
       code: discount.code,
@@ -123,8 +154,10 @@ export default function AdminDiscounts() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Submitting discount form:', form);
+    
     if (editingDiscount) {
-      setDiscounts(prev => prev.map(d =>
+      setDiscounts((prev) => prev.map((d) =>
         d.id === editingDiscount.id
           ? {
               ...d,
@@ -138,7 +171,6 @@ export default function AdminDiscounts() {
             }
           : d
       ));
-      
       toast({
         title: 'Discount updated',
         description: `${form.code.toUpperCase()} has been updated.`,
@@ -155,9 +187,7 @@ export default function AdminDiscounts() {
         isActive: form.isActive,
         expiresAt: form.expiresAt || undefined,
       };
-      
-      setDiscounts(prev => [...prev, newDiscount]);
-      
+      setDiscounts((prev) => [...prev, newDiscount]);
       toast({
         title: 'Discount created',
         description: `${form.code.toUpperCase()} has been created.`,
@@ -168,7 +198,10 @@ export default function AdminDiscounts() {
   };
 
   const handleDelete = (id: string) => {
-    setDiscounts(prev => prev.filter(d => d.id !== id));
+    const discount = discounts.find((d) => d.id === id);
+    console.log('Deleting discount:', discount?.code);
+    
+    setDiscounts((prev) => prev.filter((d) => d.id !== id));
     toast({
       title: 'Discount deleted',
       description: 'The discount code has been removed.',
@@ -176,7 +209,10 @@ export default function AdminDiscounts() {
   };
 
   const handleToggleActive = (id: string) => {
-    setDiscounts(prev => prev.map(d =>
+    const discount = discounts.find((d) => d.id === id);
+    console.log('Toggling active status for:', discount?.code);
+    
+    setDiscounts((prev) => prev.map((d) =>
       d.id === id ? { ...d, isActive: !d.isActive } : d
     ));
   };
@@ -219,7 +255,7 @@ export default function AdminDiscounts() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">
-                {discounts.filter(d => d.isActive).length}
+                {discounts.filter((d) => d.isActive).length}
               </div>
               <p className="text-sm text-muted-foreground">Active Codes</p>
             </CardContent>
@@ -324,14 +360,13 @@ export default function AdminDiscounts() {
               {editingDiscount ? 'Edit Discount Code' : 'Create Discount Code'}
             </DialogTitle>
           </DialogHeader>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="code">Code *</Label>
               <Input
                 id="code"
                 value={form.code}
-                onChange={(e) => setForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
                 placeholder="SAVE10"
                 required
               />
@@ -342,7 +377,7 @@ export default function AdminDiscounts() {
               <Input
                 id="description"
                 value={form.description}
-                onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="10% off your order"
               />
             </div>
@@ -353,7 +388,7 @@ export default function AdminDiscounts() {
                 <Select
                   value={form.discountType}
                   onValueChange={(value: 'percentage' | 'fixed') =>
-                    setForm(prev => ({ ...prev, discountType: value }))
+                    setForm((prev) => ({ ...prev, discountType: value }))
                   }
                 >
                   <SelectTrigger>
@@ -373,7 +408,7 @@ export default function AdminDiscounts() {
                   min="0"
                   step={form.discountType === 'percentage' ? '1' : '0.01'}
                   value={form.discountValue}
-                  onChange={(e) => setForm(prev => ({ ...prev, discountValue: e.target.value }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, discountValue: e.target.value }))}
                   required
                 />
               </div>
@@ -387,7 +422,7 @@ export default function AdminDiscounts() {
                 min="0"
                 step="0.01"
                 value={form.minimumOrderAmount}
-                onChange={(e) => setForm(prev => ({ ...prev, minimumOrderAmount: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, minimumOrderAmount: e.target.value }))}
                 placeholder="0"
               />
             </div>
@@ -398,7 +433,7 @@ export default function AdminDiscounts() {
                 id="expiresAt"
                 type="date"
                 value={form.expiresAt}
-                onChange={(e) => setForm(prev => ({ ...prev, expiresAt: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))}
               />
             </div>
 
@@ -410,7 +445,7 @@ export default function AdminDiscounts() {
               <Switch
                 id="isActive"
                 checked={form.isActive}
-                onCheckedChange={(checked) => setForm(prev => ({ ...prev, isActive: checked }))}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isActive: checked }))}
               />
             </div>
 

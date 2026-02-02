@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { Store, Mail, CreditCard, Bell, Shield } from 'lucide-react';
 
 export default function AdminSettings() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  
   const [storeSettings, setStoreSettings] = useState({
     storeName: 'Gadget & Thread Co.',
     storeEmail: 'support@gadgetthread.co',
@@ -37,37 +38,112 @@ export default function AdminSettings() {
     paypalClientId: '',
   });
 
+  // 🔍 DEBUG: Check authentication and role
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('=== SETTINGS AUTH DEBUG ===');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.email);
+      console.log('User ID:', user?.id);
+      
+      if (user?.id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('User role:', roleData?.role);
+        console.log('Role error:', roleError);
+        
+        const { data: isAdminData } = await supabase.rpc('is_admin');
+        console.log('is_admin() returns:', isAdminData);
+      }
+      
+      console.log('=== END AUTH DEBUG ===');
+    };
+    
+    checkAuth();
+  }, []);
+
   const handleSaveStore = async () => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
     
-    toast({
-      title: 'Settings saved',
-      description: 'Store settings have been updated.',
-    });
+    try {
+      console.log('Saving store settings:', storeSettings);
+      
+      // TODO: Implement actual save to Supabase
+      // const { error } = await supabase
+      //   .from('store_settings')
+      //   .upsert(storeSettings);
+      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      toast({
+        title: 'Settings saved',
+        description: 'Store settings have been updated.',
+      });
+    } catch (error) {
+      console.error('Failed to save store settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save store settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSaveEmail = async () => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
     
-    toast({
-      title: 'Settings saved',
-      description: 'Email notification settings have been updated.',
-    });
+    try {
+      console.log('Saving email settings:', emailSettings);
+      
+      // TODO: Implement actual save to Supabase
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      toast({
+        title: 'Settings saved',
+        description: 'Email notification settings have been updated.',
+      });
+    } catch (error) {
+      console.error('Failed to save email settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save email settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSavePayment = async () => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
     
-    toast({
-      title: 'Settings saved',
-      description: 'Payment settings have been updated.',
-    });
+    try {
+      console.log('Saving payment settings:', paymentSettings);
+      
+      // TODO: Implement actual save to Supabase
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      toast({
+        title: 'Settings saved',
+        description: 'Payment settings have been updated.',
+      });
+    } catch (error) {
+      console.error('Failed to save payment settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save payment settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -94,6 +170,7 @@ export default function AdminSettings() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Store Settings Tab */}
           <TabsContent value="store">
             <Card>
               <CardHeader>
@@ -109,7 +186,7 @@ export default function AdminSettings() {
                     <Input
                       id="storeName"
                       value={storeSettings.storeName}
-                      onChange={(e) => setStoreSettings(prev => ({ ...prev, storeName: e.target.value }))}
+                      onChange={(e) => setStoreSettings((prev) => ({ ...prev, storeName: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -118,7 +195,7 @@ export default function AdminSettings() {
                       id="storeEmail"
                       type="email"
                       value={storeSettings.storeEmail}
-                      onChange={(e) => setStoreSettings(prev => ({ ...prev, storeEmail: e.target.value }))}
+                      onChange={(e) => setStoreSettings((prev) => ({ ...prev, storeEmail: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -129,7 +206,7 @@ export default function AdminSettings() {
                     <Input
                       id="storePhone"
                       value={storeSettings.storePhone}
-                      onChange={(e) => setStoreSettings(prev => ({ ...prev, storePhone: e.target.value }))}
+                      onChange={(e) => setStoreSettings((prev) => ({ ...prev, storePhone: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -137,7 +214,7 @@ export default function AdminSettings() {
                     <Input
                       id="storeAddress"
                       value={storeSettings.storeAddress}
-                      onChange={(e) => setStoreSettings(prev => ({ ...prev, storeAddress: e.target.value }))}
+                      onChange={(e) => setStoreSettings((prev) => ({ ...prev, storeAddress: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -147,7 +224,7 @@ export default function AdminSettings() {
                   <Textarea
                     id="storeDescription"
                     value={storeSettings.storeDescription}
-                    onChange={(e) => setStoreSettings(prev => ({ ...prev, storeDescription: e.target.value }))}
+                    onChange={(e) => setStoreSettings((prev) => ({ ...prev, storeDescription: e.target.value }))}
                     rows={3}
                   />
                 </div>
@@ -159,6 +236,7 @@ export default function AdminSettings() {
             </Card>
           </TabsContent>
 
+          {/* Email Notifications Tab */}
           <TabsContent value="notifications">
             <Card>
               <CardHeader>
@@ -178,7 +256,7 @@ export default function AdminSettings() {
                   <Switch
                     checked={emailSettings.orderConfirmation}
                     onCheckedChange={(checked) =>
-                      setEmailSettings(prev => ({ ...prev, orderConfirmation: checked }))
+                      setEmailSettings((prev) => ({ ...prev, orderConfirmation: checked }))
                     }
                   />
                 </div>
@@ -193,7 +271,7 @@ export default function AdminSettings() {
                   <Switch
                     checked={emailSettings.shippingUpdates}
                     onCheckedChange={(checked) =>
-                      setEmailSettings(prev => ({ ...prev, shippingUpdates: checked }))
+                      setEmailSettings((prev) => ({ ...prev, shippingUpdates: checked }))
                     }
                   />
                 </div>
@@ -208,7 +286,7 @@ export default function AdminSettings() {
                   <Switch
                     checked={emailSettings.newMessageNotify}
                     onCheckedChange={(checked) =>
-                      setEmailSettings(prev => ({ ...prev, newMessageNotify: checked }))
+                      setEmailSettings((prev) => ({ ...prev, newMessageNotify: checked }))
                     }
                   />
                 </div>
@@ -223,7 +301,7 @@ export default function AdminSettings() {
                   <Switch
                     checked={emailSettings.reviewNotify}
                     onCheckedChange={(checked) =>
-                      setEmailSettings(prev => ({ ...prev, reviewNotify: checked }))
+                      setEmailSettings((prev) => ({ ...prev, reviewNotify: checked }))
                     }
                   />
                 </div>
@@ -238,7 +316,7 @@ export default function AdminSettings() {
                   <Switch
                     checked={emailSettings.dailyDigest}
                     onCheckedChange={(checked) =>
-                      setEmailSettings(prev => ({ ...prev, dailyDigest: checked }))
+                      setEmailSettings((prev) => ({ ...prev, dailyDigest: checked }))
                     }
                   />
                 </div>
@@ -250,6 +328,7 @@ export default function AdminSettings() {
             </Card>
           </TabsContent>
 
+          {/* Payment Settings Tab */}
           <TabsContent value="payments">
             <Card>
               <CardHeader>
@@ -286,7 +365,7 @@ export default function AdminSettings() {
                     <Switch
                       checked={paymentSettings.stripeEnabled}
                       onCheckedChange={(checked) =>
-                        setPaymentSettings(prev => ({ ...prev, stripeEnabled: checked }))
+                        setPaymentSettings((prev) => ({ ...prev, stripeEnabled: checked }))
                       }
                     />
                   </div>
@@ -306,7 +385,7 @@ export default function AdminSettings() {
                     <Switch
                       checked={paymentSettings.paypalEnabled}
                       onCheckedChange={(checked) =>
-                        setPaymentSettings(prev => ({ ...prev, paypalEnabled: checked }))
+                        setPaymentSettings((prev) => ({ ...prev, paypalEnabled: checked }))
                       }
                     />
                   </div>

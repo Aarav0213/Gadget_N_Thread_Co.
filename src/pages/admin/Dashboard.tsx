@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -9,49 +9,23 @@ import {
   TrendingUp,
   MessageSquare,
   Star,
-  ArrowUpRight,
-  ArrowDownRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-// Mock stats data
-const stats = [
-  {
-    title: 'Total Revenue',
-    value: '$12,543.00',
-    change: '+12.5%',
-    trend: 'up',
-    icon: DollarSign,
-  },
-  {
-    title: 'Orders',
-    value: '156',
-    change: '+8.2%',
-    trend: 'up',
-    icon: ShoppingCart,
-  },
-  {
-    title: 'Products',
-    value: '48',
-    change: '+3',
-    trend: 'up',
-    icon: Package,
-  },
-  {
-    title: 'Customers',
-    value: '2,340',
-    change: '+18.7%',
-    trend: 'up',
-    icon: Users,
-  },
-];
+interface Stats {
+  totalRevenue: number;
+  orderCount: number;
+  productCount: number;
+  customerCount: number;
+}
 
-const recentOrders = [
-  { id: 'GT-ABC123', customer: 'John Doe', total: 299.99, status: 'processing' },
-  { id: 'GT-DEF456', customer: 'Jane Smith', total: 149.99, status: 'shipped' },
-  { id: 'GT-GHI789', customer: 'Bob Wilson', total: 79.99, status: 'pending' },
-  { id: 'GT-JKL012', customer: 'Alice Brown', total: 449.99, status: 'delivered' },
-];
+interface RecentOrder {
+  id: string;
+  order_number: string;
+  grand_total: number;
+  status: string;
+  shipping_address: { full_name?: string } | null;
+}
 
 const statusColors: Record<string, string> = {
   pending: 'text-yellow-600 bg-yellow-100',
@@ -61,34 +35,82 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
-  // 🔍 DEBUG: Check authentication and role
+  const [stats, setStats] = useState<Stats>({
+    totalRevenue: 0,
+    orderCount: 0,
+    productCount: 0,
+    customerCount: 0,
+  });
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const checkAuth = async () => {
-      console.log('=== DASHBOARD AUTH DEBUG ===');
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user?.email);
-      console.log('User ID:', user?.id);
-      
-      if (user?.id) {
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-        
-        console.log('User role:', roleData?.role);
-        console.log('Role error:', roleError);
-        
-        const { data: isAdminData } = await supabase.rpc('is_admin');
-        console.log('is_admin() returns:', isAdminData);
+    const loadDashboardData = async () => {
+      try {
+        // Load products count
+        const { count: productCount } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true });
+
+        // Load orders with totals
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('id, order_number, grand_total, status, shipping_address, created_at')
+          .order('created_at', { ascending: false });
+
+        const orderList = orders || [];
+        const totalRevenue = orderList.reduce((acc, order) => acc + (order.grand_total || 0), 0);
+
+        // Load unique customers count (from orders)
+        const uniqueCustomers = new Set(orderList.map(o => o.shipping_address?.full_name)).size;
+
+        setStats({
+          totalRevenue,
+          orderCount: orderList.length,
+          productCount: productCount || 0,
+          customerCount: uniqueCustomers,
+        });
+
+        // Recent orders (last 5)
+        setRecentOrders(orderList.slice(0, 5).map(o => ({
+          id: o.id,
+          order_number: o.order_number || o.id.slice(0, 8),
+          grand_total: o.grand_total || 0,
+          status: o.status || 'pending',
+          shipping_address: o.shipping_address,
+        })));
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      console.log('=== END AUTH DEBUG ===');
     };
-    
-    checkAuth();
+
+    loadDashboardData();
   }, []);
+
+  const statCards = [
+    {
+      title: 'Total Revenue',
+      value: `$${stats.totalRevenue.toFixed(2)}`,
+      icon: DollarSign,
+    },
+    {
+      title: 'Orders',
+      value: stats.orderCount.toString(),
+      icon: ShoppingCart,
+    },
+    {
+      title: 'Products',
+      value: stats.productCount.toString(),
+      icon: Package,
+    },
+    {
+      title: 'Customers',
+      value: stats.customerCount.toString(),
+      icon: Users,
+    },
+  ];
 
   return (
     <AdminLayout>
@@ -100,7 +122,7 @@ export default function AdminDashboard() {
 
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
+          {statCards.map((stat) => (
             <Card key={stat.title}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -109,16 +131,8 @@ export default function AdminDashboard() {
                 <stat.icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className={`flex items-center text-xs ${
-                  stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {stat.trend === 'up' ? (
-                    <ArrowUpRight className="h-3 w-3 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3 mr-1" />
-                  )}
-                  {stat.change} from last month
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : stat.value}
                 </div>
               </CardContent>
             </Card>
@@ -134,7 +148,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <a
-                href="/admin/products/new"
+                href="/admin/products"
                 className="flex flex-col items-center justify-center p-4 rounded-lg border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-colors"
               >
                 <Package className="h-8 w-8 mb-2 text-muted-foreground" />
@@ -170,25 +184,33 @@ export default function AdminDashboard() {
               <CardTitle>Recent Orders</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between py-2"
-                  >
-                    <div>
-                      <p className="font-medium">{order.id}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer}</p>
+              {loading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : recentOrders.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No orders yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {recentOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between py-2"
+                    >
+                      <div>
+                        <p className="font-medium">{order.order_number}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.shipping_address?.full_name || 'Guest'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">${order.grand_total.toFixed(2)}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}`}>
+                          {order.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">${order.total.toFixed(2)}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[order.status]}`}>
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -204,7 +226,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="h-64 flex items-center justify-center border-2 border-dashed rounded-lg">
               <p className="text-muted-foreground">
-                Connect to your backend to view real-time analytics
+                Analytics will appear here as orders come in
               </p>
             </div>
           </CardContent>

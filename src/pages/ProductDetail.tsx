@@ -309,12 +309,26 @@ const ProductDetail = () => {
                   variant="outline"
                   onClick={(e) => {
                     e.preventDefault();
-                    toast.success('Added to wishlist!');
+                    toast.success('Saved to wishlist! (Wishlist feature coming soon)');
                   }}
                 >
                   <Heart className="h-5 w-5" />
                 </Button>
-                <Button size="lg" variant="outline">
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const url = window.location.href;
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      toast.success('Link copied to clipboard!');
+                    } catch {
+                      // Fallback for older browsers
+                      toast.info(`Share this link: ${url}`);
+                    }
+                  }}
+                >
                   <Share2 className="h-5 w-5" />
                 </Button>
               </div>

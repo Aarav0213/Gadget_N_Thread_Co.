@@ -10,7 +10,6 @@ import {
   Heart,
   Share2,
   Truck,
-  Shield,
   MessageCircle,
   Star,
 } from 'lucide-react';
@@ -305,7 +304,14 @@ const ProductDetail = () => {
                   <ShoppingBag className="h-5 w-5" />
                   {product.is_in_stock ? 'Add to Cart' : 'Out of Stock'}
                 </Button>
-                <Button size="lg" variant="outline">
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toast.success('Added to wishlist!');
+                  }}
+                >
                   <Heart className="h-5 w-5" />
                 </Button>
                 <Button size="lg" variant="outline">
@@ -327,10 +333,6 @@ const ProductDetail = () => {
                     {(product.shipping_cost ?? 0).toFixed(2)}
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5 text-muted-foreground" />
-                <span>30-day money-back guarantee</span>
               </div>
               <div className="flex items-center gap-3">
                 <MessageCircle className="h-5 w-5 text-muted-foreground" />

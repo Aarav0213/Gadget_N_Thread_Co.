@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -28,7 +29,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { Search, Eye, Package, Truck } from 'lucide-react';
+import { Search, Eye, Package, Truck, Plus } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import type { Order } from '@/lib/api';
 
@@ -50,6 +51,36 @@ const statusOptions = [
   { value: 'refunded', label: 'Refunded' },
 ];
 
+interface ManualOrderForm {
+  full_name: string;
+  email: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  phone: string;
+  notes: string;
+  items_description: string;
+  total: string;
+}
+
+const emptyManualOrder: ManualOrderForm = {
+  full_name: '',
+  email: '',
+  address_line1: '',
+  address_line2: '',
+  city: '',
+  state: '',
+  postal_code: '',
+  country: 'United States',
+  phone: '',
+  notes: '',
+  items_description: '',
+  total: '',
+};
+
 export default function AdminOrders() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -58,6 +89,9 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingForm, setTrackingForm] = useState({ number: '', url: '' });
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [manualOrder, setManualOrder] = useState<ManualOrderForm>(emptyManualOrder);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   // 🔍 DEBUG: Check authentication and role
   useEffect(() => {
@@ -161,12 +195,75 @@ export default function AdminOrders() {
     }
   };
 
+  const handleCreateManualOrder = async () => {
+    if (!manualOrder.full_name || !manualOrder.address_line1 || !manualOrder.city) {
+      toast({
+        title: 'Missing information',
+        description: 'Please fill in required shipping fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreatingOrder(true);
+    try {
+      const orderNumber = `GT-${Date.now().toString(36).toUpperCase()}`;
+      
+      const { error } = await supabase.from('orders').insert({
+        order_number: orderNumber,
+        status: 'pending',
+        subtotal: parseFloat(manualOrder.total) || 0,
+        shipping_cost: 0,
+        discount_amount: 0,
+        grand_total: parseFloat(manualOrder.total) || 0,
+        shipping_address: {
+          full_name: manualOrder.full_name,
+          email: manualOrder.email,
+          address_line1: manualOrder.address_line1,
+          address_line2: manualOrder.address_line2,
+          city: manualOrder.city,
+          state: manualOrder.state,
+          postal_code: manualOrder.postal_code,
+          country: manualOrder.country,
+          phone: manualOrder.phone,
+        },
+        customer_notes: `${manualOrder.notes}\n\nItems: ${manualOrder.items_description}`,
+      }).select().single();
+
+      if (error) throw error;
+
+      toast({
+        title: 'Order created',
+        description: `Manual order ${orderNumber} has been created.`,
+      });
+      
+      setManualOrder(emptyManualOrder);
+      setShowCreateOrder(false);
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create order.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingOrder(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Orders</h1>
-          <p className="text-muted-foreground">Manage and track customer orders</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Orders</h1>
+            <p className="text-muted-foreground">Manage and track customer orders</p>
+          </div>
+          <Button onClick={() => setShowCreateOrder(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Order
+          </Button>
         </div>
 
         <Card>
@@ -347,6 +444,139 @@ export default function AdminOrders() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Manual Order Dialog */}
+      <Dialog open={showCreateOrder} onOpenChange={setShowCreateOrder}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Manual Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Label htmlFor="mo_full_name">Full Name *</Label>
+                <Input
+                  id="mo_full_name"
+                  value={manualOrder.full_name}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, full_name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="mo_email">Email</Label>
+                <Input
+                  id="mo_email"
+                  type="email"
+                  value={manualOrder.email}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="mo_address1">Address Line 1 *</Label>
+                <Input
+                  id="mo_address1"
+                  value={manualOrder.address_line1}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, address_line1: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="mo_address2">Address Line 2</Label>
+                <Input
+                  id="mo_address2"
+                  value={manualOrder.address_line2}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, address_line2: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="mo_city">City *</Label>
+                <Input
+                  id="mo_city"
+                  value={manualOrder.city}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, city: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="mo_state">State</Label>
+                <Input
+                  id="mo_state"
+                  value={manualOrder.state}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, state: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="mo_postal">Postal Code</Label>
+                <Input
+                  id="mo_postal"
+                  value={manualOrder.postal_code}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, postal_code: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="mo_country">Country</Label>
+                <Input
+                  id="mo_country"
+                  value={manualOrder.country}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, country: e.target.value }))}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="mo_phone">Phone</Label>
+                <Input
+                  id="mo_phone"
+                  type="tel"
+                  value={manualOrder.phone}
+                  onChange={(e) => setManualOrder((prev) => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="mo_items">Items Description</Label>
+              <Textarea
+                id="mo_items"
+                value={manualOrder.items_description}
+                onChange={(e) => setManualOrder((prev) => ({ ...prev, items_description: e.target.value }))}
+                placeholder="Describe the items in this order..."
+                rows={3}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="mo_total">Order Total ($)</Label>
+              <Input
+                id="mo_total"
+                type="number"
+                step="0.01"
+                value={manualOrder.total}
+                onChange={(e) => setManualOrder((prev) => ({ ...prev, total: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="mo_notes">Order Notes</Label>
+              <Textarea
+                id="mo_notes"
+                value={manualOrder.notes}
+                onChange={(e) => setManualOrder((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any additional notes..."
+                rows={2}
+              />
+            </div>
+            
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowCreateOrder(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateManualOrder} disabled={isCreatingOrder}>
+                {isCreatingOrder ? 'Creating...' : 'Create Order'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </AdminLayout>

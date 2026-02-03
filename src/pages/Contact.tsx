@@ -85,7 +85,12 @@ export default function Contact() {
                     <Mail className="h-5 w-5 text-primary mt-0.5" />
                     <div>
                       <p className="font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">support@gadgetthread.co</p>
+                      <a 
+                        href="mailto:buisness.name.here00000@gmail.com" 
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        buisness.name.here00000@gmail.com
+                      </a>
                     </div>
                   </div>
                 </CardContent>
@@ -96,8 +101,14 @@ export default function Contact() {
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-primary mt-0.5" />
                     <div>
-                      <p className="font-medium">Phone</p>
-                      <p className="text-sm text-muted-foreground">1-800-GADGET</p>
+                      <p className="font-medium">Phone / SMS</p>
+                      <a 
+                        href="sms:+4077687484" 
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        (407) 768-7484
+                      </a>
+                      <p className="text-xs text-muted-foreground">SMS charges may apply</p>
                     </div>
                   </div>
                 </CardContent>
@@ -110,8 +121,7 @@ export default function Contact() {
                     <div>
                       <p className="font-medium">Address</p>
                       <p className="text-sm text-muted-foreground">
-                        123 Tech Street<br />
-                        San Francisco, CA 94102
+                        Windermere, FL
                       </p>
                     </div>
                   </div>

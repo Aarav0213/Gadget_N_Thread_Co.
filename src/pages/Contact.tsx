@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSquare, Send, Mail, Phone, MapPin } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function Contact() {
   const navigate = useNavigate();
@@ -41,12 +42,81 @@ export default function Contact() {
     setIsSubmitting(true);
     
     try {
-      // In a real app, this would call messagesApi.startConversation()
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Step 1: Create or get conversation
+      let conversationId: string;
+
+      if (isAuthenticated && user) {
+        // For authenticated users, check if conversation exists
+        const { data: existingConvo, error: convoFetchError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (convoFetchError && convoFetchError.code !== 'PGRST116') {
+          console.error('Error fetching conversation:', convoFetchError);
+          throw new Error(convoFetchError.message);
+        }
+
+        if (existingConvo) {
+          conversationId = existingConvo.id;
+        } else {
+          // Create new conversation for authenticated user
+          const { data: newConvo, error: convoCreateError } = await supabase
+            .from('conversations')
+            .insert({
+              user_id: user.id,
+              status: 'open',
+            })
+            .select('id')
+            .single();
+
+          if (convoCreateError) {
+            console.error('Error creating conversation:', convoCreateError);
+            throw new Error(convoCreateError.message);
+          }
+
+          conversationId = newConvo.id;
+        }
+      } else {
+        // For guests, create a conversation without user_id
+        const { data: newConvo, error: convoCreateError } = await supabase
+          .from('conversations')
+          .insert({
+            status: 'open',
+          })
+          .select('id')
+          .single();
+
+        if (convoCreateError) {
+          console.error('Error creating guest conversation:', convoCreateError);
+          throw new Error(convoCreateError.message);
+        }
+
+        conversationId = newConvo.id;
+      }
+
+      // Step 2: Create the message
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: isAuthenticated && user ? user.id : null,
+          sender_name: form.name,
+          sender_email: form.email,
+          subject: form.subject,
+          content: form.message,
+          is_from_customer: true,
+        });
+
+      if (messageError) {
+        console.error('Error creating message:', messageError);
+        throw new Error(messageError.message);
+      }
+
       toast({
         title: 'Message sent!',
-        description: 'We\'ll get back to you as soon as possible.',
+        description: "We'll get back to you as soon as possible.",
       });
       
       setForm(prev => ({ ...prev, subject: '', message: '' }));
@@ -54,10 +124,11 @@ export default function Contact() {
       if (isAuthenticated) {
         navigate('/account');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to send message:', error);
       toast({
         title: 'Failed to send',
-        description: 'There was an error sending your message. Please try again.',
+        description: error.message || 'There was an error sending your message. Please try again.',
         variant: 'destructive',
       });
     } finally {

@@ -113,11 +113,9 @@ export default function Checkout() {
           order_number: orderNumber,
           status: 'pending',
           subtotal: subtotal,
-          shipping_cost: shippingCost,
-          discount_code: discountCode || null,
-          discount_amount: discountAmount,
+          shipping_total: shippingCost,
+          discount_total: discountAmount,
           grand_total: total,
-          total: total, // Some schemas use 'total' instead of 'grand_total'
           customer_notes: customerNotes || null,
           
           // Shipping address
@@ -204,35 +202,77 @@ export default function Checkout() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2">
                       <Label htmlFor="full_name">Full Name *</Label>
-                      <Input id="full_name" value={shippingAddress.full_name} onChange={(e) => handleInputChange('full_name', e.target.value)} required />
+                      <Input 
+                        id="full_name" 
+                        value={shippingAddress.full_name} 
+                        onChange={(e) => handleInputChange('full_name', e.target.value)} 
+                        required 
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <Label htmlFor="address_line1">Address Line 1 *</Label>
-                      <Input id="address_line1" value={shippingAddress.address_line1} onChange={(e) => handleInputChange('address_line1', e.target.value)} placeholder="Street address" required />
+                      <Input 
+                        id="address_line1" 
+                        value={shippingAddress.address_line1} 
+                        onChange={(e) => handleInputChange('address_line1', e.target.value)} 
+                        placeholder="Street address" 
+                        required 
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <Label htmlFor="address_line2">Address Line 2</Label>
-                      <Input id="address_line2" value={shippingAddress.address_line2} onChange={(e) => handleInputChange('address_line2', e.target.value)} placeholder="Apartment, suite, etc. (optional)" />
+                      <Input 
+                        id="address_line2" 
+                        value={shippingAddress.address_line2} 
+                        onChange={(e) => handleInputChange('address_line2', e.target.value)} 
+                        placeholder="Apartment, suite, etc. (optional)" 
+                      />
                     </div>
                     <div>
                       <Label htmlFor="city">City *</Label>
-                      <Input id="city" value={shippingAddress.city} onChange={(e) => handleInputChange('city', e.target.value)} required />
+                      <Input 
+                        id="city" 
+                        value={shippingAddress.city} 
+                        onChange={(e) => handleInputChange('city', e.target.value)} 
+                        required 
+                      />
                     </div>
                     <div>
                       <Label htmlFor="state">State / Province *</Label>
-                      <Input id="state" value={shippingAddress.state} onChange={(e) => handleInputChange('state', e.target.value)} required />
+                      <Input 
+                        id="state" 
+                        value={shippingAddress.state} 
+                        onChange={(e) => handleInputChange('state', e.target.value)} 
+                        required 
+                      />
                     </div>
                     <div>
                       <Label htmlFor="postal_code">Postal Code *</Label>
-                      <Input id="postal_code" value={shippingAddress.postal_code} onChange={(e) => handleInputChange('postal_code', e.target.value)} required />
+                      <Input 
+                        id="postal_code" 
+                        value={shippingAddress.postal_code} 
+                        onChange={(e) => handleInputChange('postal_code', e.target.value)} 
+                        required 
+                      />
                     </div>
                     <div>
                       <Label htmlFor="country">Country *</Label>
-                      <Input id="country" value={shippingAddress.country} onChange={(e) => handleInputChange('country', e.target.value)} required />
+                      <Input 
+                        id="country" 
+                        value={shippingAddress.country} 
+                        onChange={(e) => handleInputChange('country', e.target.value)} 
+                        required 
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <Label htmlFor="phone">Phone Number</Label>
-                      <Input id="phone" type="tel" value={shippingAddress.phone} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder="For delivery updates" />
+                      <Input 
+                        id="phone" 
+                        type="tel" 
+                        value={shippingAddress.phone} 
+                        onChange={(e) => handleInputChange('phone', e.target.value)} 
+                        placeholder="For delivery updates" 
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -243,7 +283,12 @@ export default function Checkout() {
                   <CardTitle>Order Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} placeholder="Any special instructions..." rows={3} />
+                  <Textarea 
+                    value={customerNotes} 
+                    onChange={(e) => setCustomerNotes(e.target.value)} 
+                    placeholder="Any special instructions..." 
+                    rows={3} 
+                  />
                 </CardContent>
               </Card>
 
@@ -286,7 +331,13 @@ export default function Checkout() {
                   {items.map((item) => (
                     <div key={item.product.id} className="flex gap-3">
                       <div className="w-16 h-16 bg-muted rounded overflow-hidden flex-shrink-0">
-                        {item.product.image_url && <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />}
+                        {item.product.image_url && (
+                          <img 
+                            src={item.product.image_url} 
+                            alt={item.product.name} 
+                            className="w-full h-full object-cover" 
+                          />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{item.product.name}</p>

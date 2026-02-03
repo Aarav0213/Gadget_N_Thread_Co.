@@ -35,186 +35,174 @@ interface DiscountCode {
   id: string;
   code: string;
   description: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  minimumOrderAmount: number;
-  usageCount: number;
-  isActive: boolean;
-  expiresAt?: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  minimum_order_amount: number;
+  usage_count: number;
+  is_active: boolean;
+  expires_at?: string;
 }
-
-const mockDiscounts: DiscountCode[] = [
-  {
-    id: '1',
-    code: 'SAVE10',
-    description: '10% off your order',
-    discountType: 'percentage',
-    discountValue: 10,
-    minimumOrderAmount: 50,
-    usageCount: 145,
-    isActive: true,
-  },
-  {
-    id: '2',
-    code: 'WELCOME20',
-    description: '$20 off for new customers',
-    discountType: 'fixed',
-    discountValue: 20,
-    minimumOrderAmount: 100,
-    usageCount: 89,
-    isActive: true,
-    expiresAt: '2024-03-01',
-  },
-  {
-    id: '3',
-    code: 'FREESHIP',
-    description: 'Free shipping on orders over $75',
-    discountType: 'fixed',
-    discountValue: 10,
-    minimumOrderAmount: 75,
-    usageCount: 234,
-    isActive: false,
-  },
-];
 
 export default function AdminDiscounts() {
   const { toast } = useToast();
-  const [discounts, setDiscounts] = useState(mockDiscounts);
+  const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<DiscountCode | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     code: '',
     description: '',
-    discountType: 'percentage' as 'percentage' | 'fixed',
-    discountValue: '',
-    minimumOrderAmount: '',
-    isActive: true,
-    expiresAt: '',
+    discount_type: 'percentage' as 'percentage' | 'fixed',
+    discount_value: '',
+    minimum_order_amount: '',
+    is_active: true,
+    expires_at: '',
   });
 
-  // 🔍 DEBUG: Check authentication and role
   useEffect(() => {
-    const checkAuth = async () => {
-      console.log('=== DISCOUNTS AUTH DEBUG ===');
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user?.email);
-      console.log('User ID:', user?.id);
-      
-      if (user?.id) {
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-        
-        console.log('User role:', roleData?.role);
-        console.log('Role error:', roleError);
-        
-        const { data: isAdminData } = await supabase.rpc('is_admin');
-        console.log('is_admin() returns:', isAdminData);
-      }
-      
-      console.log('=== END AUTH DEBUG ===');
-    };
-    
-    checkAuth();
+    loadDiscounts();
   }, []);
 
+  const loadDiscounts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('discount_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDiscounts(data || []);
+    } catch (error) {
+      console.error('Failed to load discounts:', error);
+      // Table might not exist yet, just show empty state
+      setDiscounts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAdd = () => {
-    console.log('Opening form to create new discount');
     setEditingDiscount(null);
     setForm({
       code: '',
       description: '',
-      discountType: 'percentage',
-      discountValue: '',
-      minimumOrderAmount: '',
-      isActive: true,
-      expiresAt: '',
+      discount_type: 'percentage',
+      discount_value: '',
+      minimum_order_amount: '',
+      is_active: true,
+      expires_at: '',
     });
     setIsFormOpen(true);
   };
 
   const handleEdit = (discount: DiscountCode) => {
-    console.log('Opening form to edit discount:', discount.code);
     setEditingDiscount(discount);
     setForm({
       code: discount.code,
-      description: discount.description,
-      discountType: discount.discountType,
-      discountValue: discount.discountValue.toString(),
-      minimumOrderAmount: discount.minimumOrderAmount.toString(),
-      isActive: discount.isActive,
-      expiresAt: discount.expiresAt || '',
+      description: discount.description || '',
+      discount_type: discount.discount_type,
+      discount_value: discount.discount_value.toString(),
+      minimum_order_amount: (discount.minimum_order_amount || 0).toString(),
+      is_active: discount.is_active,
+      expires_at: discount.expires_at || '',
     });
     setIsFormOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('Submitting discount form:', form);
-    
-    if (editingDiscount) {
-      setDiscounts((prev) => prev.map((d) =>
-        d.id === editingDiscount.id
-          ? {
-              ...d,
-              code: form.code.toUpperCase(),
-              description: form.description,
-              discountType: form.discountType,
-              discountValue: parseFloat(form.discountValue),
-              minimumOrderAmount: parseFloat(form.minimumOrderAmount) || 0,
-              isActive: form.isActive,
-              expiresAt: form.expiresAt || undefined,
-            }
-          : d
-      ));
-      toast({
-        title: 'Discount updated',
-        description: `${form.code.toUpperCase()} has been updated.`,
-      });
-    } else {
-      const newDiscount: DiscountCode = {
-        id: Date.now().toString(),
+    setIsSubmitting(true);
+
+    try {
+      const discountData = {
         code: form.code.toUpperCase(),
         description: form.description,
-        discountType: form.discountType,
-        discountValue: parseFloat(form.discountValue),
-        minimumOrderAmount: parseFloat(form.minimumOrderAmount) || 0,
-        usageCount: 0,
-        isActive: form.isActive,
-        expiresAt: form.expiresAt || undefined,
+        discount_type: form.discount_type,
+        discount_value: parseFloat(form.discount_value),
+        minimum_order_amount: parseFloat(form.minimum_order_amount) || 0,
+        is_active: form.is_active,
+        expires_at: form.expires_at || null,
       };
-      setDiscounts((prev) => [...prev, newDiscount]);
+
+      if (editingDiscount) {
+        const { error } = await supabase
+          .from('discount_codes')
+          .update(discountData)
+          .eq('id', editingDiscount.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Discount updated',
+          description: `${form.code.toUpperCase()} has been updated.`,
+        });
+      } else {
+        const { error } = await supabase
+          .from('discount_codes')
+          .insert({ ...discountData, usage_count: 0 });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Discount created',
+          description: `${form.code.toUpperCase()} has been created.`,
+        });
+      }
+
+      setIsFormOpen(false);
+      loadDiscounts();
+    } catch (error) {
+      console.error('Failed to save discount:', error);
       toast({
-        title: 'Discount created',
-        description: `${form.code.toUpperCase()} has been created.`,
+        title: 'Error',
+        description: 'Failed to save discount code.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this discount code?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('discount_codes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Discount deleted',
+        description: 'The discount code has been removed.',
+      });
+      loadDiscounts();
+    } catch (error) {
+      console.error('Failed to delete discount:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete discount code.',
+        variant: 'destructive',
       });
     }
-    
-    setIsFormOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    const discount = discounts.find((d) => d.id === id);
-    console.log('Deleting discount:', discount?.code);
-    
-    setDiscounts((prev) => prev.filter((d) => d.id !== id));
-    toast({
-      title: 'Discount deleted',
-      description: 'The discount code has been removed.',
-    });
-  };
+  const handleToggleActive = async (discount: DiscountCode) => {
+    try {
+      const { error } = await supabase
+        .from('discount_codes')
+        .update({ is_active: !discount.is_active })
+        .eq('id', discount.id);
 
-  const handleToggleActive = (id: string) => {
-    const discount = discounts.find((d) => d.id === id);
-    console.log('Toggling active status for:', discount?.code);
-    
-    setDiscounts((prev) => prev.map((d) =>
-      d.id === id ? { ...d, isActive: !d.isActive } : d
-    ));
+      if (error) throw error;
+      loadDiscounts();
+    } catch (error) {
+      console.error('Failed to toggle discount:', error);
+    }
   };
 
   const copyCode = (code: string) => {
@@ -255,7 +243,7 @@ export default function AdminDiscounts() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">
-                {discounts.filter((d) => d.isActive).length}
+                {discounts.filter((d) => d.is_active).length}
               </div>
               <p className="text-sm text-muted-foreground">Active Codes</p>
             </CardContent>
@@ -263,7 +251,7 @@ export default function AdminDiscounts() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">
-                {discounts.reduce((acc, d) => acc + d.usageCount, 0)}
+                {discounts.reduce((acc, d) => acc + (d.usage_count || 0), 0)}
               </div>
               <p className="text-sm text-muted-foreground">Total Uses</p>
             </CardContent>
@@ -275,80 +263,88 @@ export default function AdminDiscounts() {
             <CardTitle>All Discount Codes</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Discount</TableHead>
-                  <TableHead>Minimum Order</TableHead>
-                  <TableHead>Uses</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {discounts.map((discount) => (
-                  <TableRow key={discount.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="px-2 py-1 bg-muted rounded font-mono text-sm">
-                          {discount.code}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => copyCode(discount.code)}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {discount.description}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {discount.discountType === 'percentage'
-                          ? `${discount.discountValue}%`
-                          : `$${discount.discountValue}`}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {discount.minimumOrderAmount > 0
-                        ? `$${discount.minimumOrderAmount}`
-                        : 'None'}
-                    </TableCell>
-                    <TableCell>{discount.usageCount}</TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={discount.isActive}
-                        onCheckedChange={() => handleToggleActive(discount.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(discount)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => handleDelete(discount.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <p className="text-muted-foreground">Loading discounts...</p>
+            ) : discounts.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No discount codes yet. Create your first one!</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Discount</TableHead>
+                    <TableHead>Minimum Order</TableHead>
+                    <TableHead>Uses</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {discounts.map((discount) => (
+                    <TableRow key={discount.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="px-2 py-1 bg-muted rounded font-mono text-sm">
+                            {discount.code}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => copyCode(discount.code)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        {discount.description && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {discount.description}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {discount.discount_type === 'percentage'
+                            ? `${discount.discount_value}%`
+                            : `$${discount.discount_value}`}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {discount.minimum_order_amount > 0
+                          ? `$${discount.minimum_order_amount}`
+                          : 'None'}
+                      </TableCell>
+                      <TableCell>{discount.usage_count || 0}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={discount.is_active}
+                          onCheckedChange={() => handleToggleActive(discount)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(discount)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => handleDelete(discount.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -384,11 +380,11 @@ export default function AdminDiscounts() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="discountType">Discount Type</Label>
+                <Label htmlFor="discount_type">Discount Type</Label>
                 <Select
-                  value={form.discountType}
+                  value={form.discount_type}
                   onValueChange={(value: 'percentage' | 'fixed') =>
-                    setForm((prev) => ({ ...prev, discountType: value }))
+                    setForm((prev) => ({ ...prev, discount_type: value }))
                   }
                 >
                   <SelectTrigger>
@@ -401,51 +397,51 @@ export default function AdminDiscounts() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="discountValue">Value *</Label>
+                <Label htmlFor="discount_value">Value *</Label>
                 <Input
-                  id="discountValue"
+                  id="discount_value"
                   type="number"
                   min="0"
-                  step={form.discountType === 'percentage' ? '1' : '0.01'}
-                  value={form.discountValue}
-                  onChange={(e) => setForm((prev) => ({ ...prev, discountValue: e.target.value }))}
+                  step={form.discount_type === 'percentage' ? '1' : '0.01'}
+                  value={form.discount_value}
+                  onChange={(e) => setForm((prev) => ({ ...prev, discount_value: e.target.value }))}
                   required
                 />
               </div>
             </div>
 
             <div>
-              <Label htmlFor="minimumOrderAmount">Minimum Order Amount</Label>
+              <Label htmlFor="minimum_order_amount">Minimum Order Amount</Label>
               <Input
-                id="minimumOrderAmount"
+                id="minimum_order_amount"
                 type="number"
                 min="0"
                 step="0.01"
-                value={form.minimumOrderAmount}
-                onChange={(e) => setForm((prev) => ({ ...prev, minimumOrderAmount: e.target.value }))}
+                value={form.minimum_order_amount}
+                onChange={(e) => setForm((prev) => ({ ...prev, minimum_order_amount: e.target.value }))}
                 placeholder="0"
               />
             </div>
 
             <div>
-              <Label htmlFor="expiresAt">Expiration Date (optional)</Label>
+              <Label htmlFor="expires_at">Expiration Date (optional)</Label>
               <Input
-                id="expiresAt"
+                id="expires_at"
                 type="date"
-                value={form.expiresAt}
-                onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))}
+                value={form.expires_at}
+                onChange={(e) => setForm((prev) => ({ ...prev, expires_at: e.target.value }))}
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="isActive">Active</Label>
+                <Label htmlFor="is_active">Active</Label>
                 <p className="text-sm text-muted-foreground">Enable this discount code</p>
               </div>
               <Switch
-                id="isActive"
-                checked={form.isActive}
-                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, isActive: checked }))}
+                id="is_active"
+                checked={form.is_active}
+                onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
               />
             </div>
 
@@ -453,8 +449,8 @@ export default function AdminDiscounts() {
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {editingDiscount ? 'Update Discount' : 'Create Discount'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : editingDiscount ? 'Update Discount' : 'Create Discount'}
               </Button>
             </div>
           </form>

@@ -188,9 +188,24 @@ export default function Checkout() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground text-sm">
-                    Payments are simulated. Connect your provider to accept real payments.
+                  <p className="text-muted-foreground text-sm mb-3">
+                    To complete your payment, please contact us:
                   </p>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <a 
+                        href="mailto:buisness.name.here00000@gmail.com" 
+                        className="text-primary hover:underline font-medium"
+                      >
+                        buisness.name.here00000@gmail.com
+                      </a>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <a href="sms:+4077687484" className="hover:text-foreground">
+                        (407) 768-7484 (SMS charges may apply)
+                      </a>
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>

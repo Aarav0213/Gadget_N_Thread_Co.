@@ -11,6 +11,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/use-toast';
 import { ShoppingBag, CreditCard, Truck } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface ShippingAddress {
   full_name: string;
@@ -96,10 +97,73 @@ export default function Checkout() {
     setIsSubmitting(true);
 
     try {
-      // Simulate order placement
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      // Generate order number
       const orderNumber = `GT-${Date.now().toString(36).toUpperCase()}`;
+
+      // Calculate totals
+      const subtotal = getSubtotal();
+      const shippingCost = getShippingTotal();
+      const total = getTotal();
+
+      // Step 1: Create the order in the database
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user?.id,
+          order_number: orderNumber,
+          status: 'pending',
+          subtotal: subtotal,
+          shipping_cost: shippingCost,
+          discount_code: discountCode || null,
+          discount_amount: discountAmount,
+          grand_total: total,
+          total: total, // Some schemas use 'total' instead of 'grand_total'
+          customer_notes: customerNotes || null,
+          
+          // Shipping address
+          shipping_full_name: shippingAddress.full_name,
+          shipping_address_line1: shippingAddress.address_line1,
+          shipping_address_line2: shippingAddress.address_line2 || null,
+          shipping_city: shippingAddress.city,
+          shipping_state: shippingAddress.state,
+          shipping_postal_code: shippingAddress.postal_code,
+          shipping_country: shippingAddress.country,
+          shipping_phone: shippingAddress.phone || null,
+        })
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('Order creation error:', orderError);
+        throw new Error(orderError.message);
+      }
+
+      if (!orderData) {
+        throw new Error('No order data returned');
+      }
+
+      // Step 2: Create order items
+      const orderItems = items.map(item => ({
+        order_id: orderData.id,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        total_price: item.product.price * item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) {
+        console.error('Order items creation error:', itemsError);
+        // Try to delete the order if items fail
+        await supabase.from('orders').delete().eq('id', orderData.id);
+        throw new Error(itemsError.message);
+      }
+
+      // Success! Clear the cart
       clearCart();
 
       toast({
@@ -108,10 +172,12 @@ export default function Checkout() {
       });
 
       navigate('/account');
-    } catch {
+      
+    } catch (err: any) {
+      console.error('Order placement failed:', err);
       toast({
         title: 'Order failed',
-        description: 'There was an error placing your order. Please try again.',
+        description: err.message || 'There was an error placing your order. Please try again.',
         variant: 'destructive',
       });
     } finally {

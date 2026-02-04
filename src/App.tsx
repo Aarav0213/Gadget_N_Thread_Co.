@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
-
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -32,6 +31,33 @@ import AdminSettings from "./pages/admin/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Health Check Component
+const Health = () => {
+  return (
+    <div style={{ 
+      fontFamily: 'monospace', 
+      padding: '40px', 
+      maxWidth: '600px', 
+      margin: '0 auto' 
+    }}>
+      <h1 style={{ fontSize: '24px', marginBottom: '20px' }}>Health Check</h1>
+      <pre style={{ 
+        background: '#f4f4f4', 
+        padding: '20px', 
+        borderRadius: '8px',
+        fontSize: '14px'
+      }}>
+        {JSON.stringify({
+          status: 'ok',
+          service: 'Gadget & Thread Co.',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime ? `${Math.floor(process.uptime())}s` : 'N/A'
+        }, null, 2)}
+      </pre>
+    </div>
+  );
+};
 
 const App = () => {
   const setSession = useAuthStore((state) => state.setSession);
@@ -61,6 +87,10 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Health Check */}
+            <Route path="/health" element={<Health />} />
+            
+            {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/products" element={<Products />} />
             <Route path="/products/:slug" element={<ProductDetail />} />
@@ -75,7 +105,7 @@ const App = () => {
             <Route path="/track-order" element={<TrackOrder />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
-
+            
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/products" element={<AdminProducts />} />
@@ -85,7 +115,7 @@ const App = () => {
             <Route path="/admin/messages" element={<AdminMessages />} />
             <Route path="/admin/discounts" element={<AdminDiscounts />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
-
+            
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>

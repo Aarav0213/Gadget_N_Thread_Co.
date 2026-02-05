@@ -82,19 +82,18 @@ export function Footer() {
               <li className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 <a href="mailto:buisness.name.here00000@gmail.com" className="hover:text-foreground transition-colors">
-                  buisness.name.here00000@gmail.com (It's our legit email, don't mind the name 😅"
+                  Business Email — Expect responses in 1-3 business days
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
                 <a href="sms:+4077687484" className="hover:text-foreground transition-colors">
-                  (407) 768-7484 sms charges may apply
+                  (407) 768-7484 — sms charges may apply
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 mt-0.5" />
                 <span>
-                  Address somewhere in<br />
                   Windermere, Fl
                 </span>
               </li>

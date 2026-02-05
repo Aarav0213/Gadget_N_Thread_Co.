@@ -75,9 +75,13 @@ const Privacy = () => {
             If you have questions about this privacy policy, please contact us at:
           </p>
           <ul>
-            <li>Email: privacy@gadgetandthread.co</li>
-            <li>Phone: (123) 456-7890</li>
-            <li>Address: 123 Commerce Street, City, State 12345</li>
+            <li>Email: <a href="mailto:buisness.name.here00000@gmail.com" className="hover:text-foreground transition-colors">
+                  Business Email — Expect responses in 1-3 business days</a>
+            </li>
+            <li>Phone: <a href="sms:+4077687484" className="hover:text-foreground transition-colors">
+                  (407) 768-7484 — sms charges may apply</a>
+            </li>
+            <li>Address: Windermere Florida</li>
           </ul>
         </div>
       </div>

@@ -163,13 +163,13 @@ const ProductDetail = () => {
         <div className="grid lg:grid-cols-2 gap-12">
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="relative aspect-square overflow-hidden rounded-lg bg-secondary/30">
+            <div className="relative h-[500px] overflow-hidden rounded-lg bg-secondary/30 flex items-center justify-center">
               <AnimatePresence mode="wait">
                 <motion.img
                   key={currentImageIndex}
                   src={images[currentImageIndex].image_url}
                   alt={images[currentImageIndex].alt_text || product.name}
-                  className="h-full w-full object-cover"
+                  className="max-h-full max-w-full object-contain"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}

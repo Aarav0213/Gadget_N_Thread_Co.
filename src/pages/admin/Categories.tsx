@@ -39,6 +39,7 @@ export default function AdminCategories() {
     slug: '',
     description: '',
     is_active: true,
+    image_url: '',
   });
 
   // 🔍 DEBUG: Check authentication and role
@@ -94,7 +95,7 @@ export default function AdminCategories() {
   const handleAdd = () => {
     console.log('Opening form to add new category');
     setEditingCategory(null);
-    setForm({ name: '', slug: '', description: '', is_active: true });
+    setForm({ name: '', slug: '', description: '', is_active: true, image_url: '' });
     setIsFormOpen(true);
   };
 
@@ -106,6 +107,7 @@ export default function AdminCategories() {
       slug: category.slug,
       description: category.description || '',
       is_active: category.is_active,
+      image_url: category.image_url || '',
     });
     setIsFormOpen(true);
   };
@@ -306,6 +308,29 @@ export default function AdminCategories() {
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="image_url">Image URL</Label>
+              <Input
+                id="image_url"
+                type="url"
+                placeholder="https://example.com/image.jpg"
+                value={form.image_url}
+                onChange={(e) => setForm((prev) => ({ ...prev, image_url: e.target.value }))}
+              />
+              {form.image_url && (
+                <div className="mt-2 w-20 h-20 bg-muted rounded overflow-hidden">
+                  <img
+                    src={form.image_url}
+                    alt="Category preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between">
